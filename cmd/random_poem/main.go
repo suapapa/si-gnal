@@ -12,6 +12,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/suapapa/signal/internal/poem"
+	"github.com/suapapa/signal/internal/poem/ai"
 )
 
 func main() {
@@ -53,12 +54,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if os.Getenv("GEMINI_API_KEY") != "" {
-		if err := p.AIFix(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "AI 교정 중 오류 발생: %v\n", err)
-		}
-	}
-
 	switch outFmt {
 	case "txt":
 		fmt.Println("\n" + strings.Repeat("=", 50))
@@ -84,5 +79,21 @@ func main() {
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("알 수 없는 출력 형식: %s\n", outFmt)
+	}
+
+	if os.Getenv("GEMINI_API_KEY") != "" {
+		aiFix, err := ai.NewAI(context.Background())
+		if err != nil {
+			log.Printf("오류: %v\n", err)
+			return
+		}
+		defer aiFix.Close()
+		log.Println("AI 교정 중...")
+		aiFix.CleanupContent(context.Background(), p)
+		aiFix.FixContentForTTS(context.Background(), p)
+
+		fmt.Println(strings.Repeat("=", 50))
+		fmt.Println("📣 낭송 대본:")
+		fmt.Println(p.Content)
 	}
 }

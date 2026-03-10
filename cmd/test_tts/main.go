@@ -1,10 +1,13 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
 	"github.com/suapapa/signal/internal/tts"
+	"github.com/suapapa/signal/internal/tts/htgo"
+	"github.com/suapapa/signal/internal/tts/supertonic"
 )
 
 var (
@@ -12,22 +15,37 @@ var (
 )
 
 func main() {
-	// 1. Get default parameters for TTS
-	params := tts.NewDefaultParameters()
-	params.ONNXDir = "../../assets/onnx"
-	params.VoiceStyles = []string{
-		"../../assets/voice_styles/F5.json",
+	engineFlag := flag.String("engine", "supertonic", "TTS engine to use: htgo, supertonic")
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) > 0 {
+		inputText = args[0]
 	}
 
-	if len(os.Args) > 1 {
-		inputText = os.Args[1]
+	var ttsEngine tts.TTS
+	var err error
+
+	// 1 & 2. Initialize the TTS engine based on the selected flag
+	switch *engineFlag {
+	case "htgo":
+		ttsEngine, err = htgo.NewTTS("ko")
+	case "supertonic":
+		params := supertonic.NewDefaultParameters()
+		params.TotalStep = 32
+		params.ONNXDir = "../../assets/onnx"
+		params.Speed = 0.85
+		params.SilenceDuration = 1.2
+		params.VoiceStyles = []string{
+			"../../assets/voice_styles/F5.json",
+		}
+		ttsEngine, err = supertonic.NewTTS(params)
+	default:
+		log.Fatalf("Unknown engine: %s. Available options: htgo, melotts, supertonic", *engineFlag)
 	}
 
-	// 2. Initialize the TTS engine
-	// Make sure that ONNX runtime and models (assets/onnx, assets/voice_styles/F5.json) are available in the path.
-	ttsEngine, err := tts.NewTTS(params)
 	if err != nil {
-		log.Fatalf("Failed to initialize TTS engine: %v", err)
+		log.Fatalf("Failed to initialize TTS engine %s: %v", *engineFlag, err)
 	}
 	defer ttsEngine.Close()
 
@@ -40,7 +58,7 @@ func main() {
 	defer f.Close()
 
 	// 4. Encode the text and write it as WAV to the file
-	log.Printf("Generating speech for: %q...\n", inputText)
+	log.Printf("Generating speech for: %q using engine %s...\n", inputText, *engineFlag)
 	err = ttsEngine.EncodeWavIO(f, inputText)
 	if err != nil {
 		log.Fatalf("Failed to encode wav: %v", err)

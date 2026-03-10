@@ -8,6 +8,8 @@ require (
 	github.com/go-audio/wav v1.1.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/generative-ai-go v0.20.1
+	github.com/hajimehoshi/go-mp3 v0.3.3
+	github.com/hegedustibor/htgo-tts v0.0.0-20240912200108-467b3e535435
 	github.com/yalue/onnxruntime_go v1.27.0
 	golang.org/x/net v0.51.0
 	golang.org/x/text v0.34.0
@@ -31,6 +33,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.12 // indirect
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
+	github.com/hajimehoshi/oto/v2 v2.2.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect

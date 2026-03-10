@@ -10,31 +10,54 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/suapapa/signal/internal/poem"
+	"github.com/suapapa/signal/internal/poem/ai"
 	wirephone_sound "github.com/suapapa/signal/internal/sound/wirephone"
 	"github.com/suapapa/signal/internal/tts"
+	"github.com/suapapa/signal/internal/tts/htgo"
+	"github.com/suapapa/signal/internal/tts/supertonic"
 )
 
 var (
 	batch      int
 	enticSound bool
 	addNoise   bool
+	ttsEngine  string
 )
 
 func main() {
 	flag.IntVar(&batch, "b", 1, "batch count")
 	flag.BoolVar(&enticSound, "e", false, "apply wire-phone effect on output")
 	flag.BoolVar(&addNoise, "n", false, "add noise")
+	flag.StringVar(&ttsEngine, "t", "supertonic", "tts engine (supertonic, htgo, melotts)")
 	flag.Parse()
 
 	// init engines
-	ttsParams := tts.NewDefaultParameters()
-	ttsParams.TotalStep = 32
-	ttsParams.Speed = 0.8
-	t, err := tts.NewTTS(ttsParams)
+
+	var t tts.TTS
+	var err error
+
+	switch ttsEngine {
+	case "supertonic":
+		ttsParams := supertonic.NewDefaultParameters()
+		ttsParams.TotalStep = 32
+		ttsParams.Speed = 0.85
+		ttsParams.SilenceDuration = 1.2
+		t, err = supertonic.NewTTS(ttsParams)
+	case "htgo":
+		t, err = htgo.NewTTS("ko")
+	default:
+		log.Fatalf("unknown tts engine: %s", ttsEngine)
+	}
 	if err != nil {
 		log.Fatalf("failed to init TTS: %v", err)
 	}
 	defer t.Close()
+
+	aiFix, err := ai.NewAI(context.Background())
+	if err != nil {
+		log.Fatalf("failed to init AI: %v", err)
+	}
+	defer aiFix.Close()
 
 	for i := 0; i < batch; i++ {
 		// Fetch a random poem
@@ -46,6 +69,20 @@ func main() {
 			log.Fatal("faile to generate yaml for poem")
 		}
 		os.Stdout.Write(yamlPoem)
+
+		// cleanup poem content
+		if err := aiFix.CleanupContent(context.Background(), p); err != nil {
+			log.Printf("CleanupContent failed: %v", err)
+		}
+
+		// fix poem content for tts
+		if err := aiFix.FixContentForTTS(context.Background(), p); err != nil {
+			log.Printf("FixContentForTTS failed: %v", err)
+		}
+
+		// print poem content
+		fmt.Println("Poem Content:")
+		fmt.Println(p.Content)
 
 		// make tts wav for poem content
 		fmt.Println("Generating TTS...")
@@ -119,10 +156,6 @@ func fetchRandomPoem() *poem.Poem {
 	p, err := poem.GetPoemDetail(link)
 	if err != nil {
 		log.Fatalf("failed to get poem detail: %v", err)
-	}
-
-	if err := p.AIFix(context.Background()); err != nil {
-		log.Printf("AIFix failed: %v", err)
 	}
 
 	return p
