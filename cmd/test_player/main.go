@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +18,7 @@ func main() {
 	wavFilePath := os.Args[1]
 
 	log.Printf("Playing %s...", wavFilePath)
-	if err := player.PlayWav(wavFilePath); err != nil {
+	if err := player.PlayWav(context.Background(), wavFilePath); err != nil {
 		log.Fatalf("failed to play %s: %v", wavFilePath, err)
 	}
 	log.Println("Done")

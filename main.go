@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,6 +30,11 @@ var (
 	addNoise   bool
 	ttsEngine  string
 	playOutput bool
+
+	playMu             sync.Mutex
+	isPlaying          bool
+	playCancel         context.CancelFunc
+	currentPlayingFile string
 )
 
 func main() {
@@ -120,22 +126,66 @@ func main() {
 			return
 		}
 
+		playMu.Lock()
+		if isPlaying {
+			playMu.Unlock()
+			http.Error(w, "Already playing", http.StatusConflict)
+			return
+		}
+
 		select {
 		case job := <-wavQueue:
+			isPlaying = true
+			var pCtx context.Context
+			pCtx, playCancel = context.WithCancel(context.Background())
+			currentPlayingFile = job.WavName
+			playMu.Unlock()
+
 			go func() {
+				defer func() {
+					playMu.Lock()
+					isPlaying = false
+					playCancel = nil
+					os.Remove(currentPlayingFile)
+					currentPlayingFile = ""
+					playMu.Unlock()
+				}()
 				log.Printf("▶️ Playing %s...", job.WavName)
-				if err := player.PlayWav(job.WavName); err != nil {
+				if err := player.PlayWav(pCtx, job.WavName); err != nil {
 					log.Printf("failed to play %s: %v", job.WavName, err)
 				}
-				os.Remove(job.WavName) // Cleanup after playing
 			}()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(job)
 		default:
+			playMu.Unlock()
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintln(w, "Queue is empty, try again later")
 		}
+	})
+
+	mux.HandleFunc("/api/stop", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		playMu.Lock()
+		defer playMu.Unlock()
+
+		if !isPlaying {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, "Not playing")
+			return
+		}
+
+		if playCancel != nil {
+			playCancel()
+		}
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Stopped")
 	})
 
 	port := ":8080"

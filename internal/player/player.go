@@ -1,6 +1,7 @@
 package player
 
 import (
+	"context"
 	"os"
 	"sync"
 	"time"
@@ -17,7 +18,7 @@ var (
 )
 
 // PlayWav plays the wav file at the given filepath through the system's default speaker.
-func PlayWav(filepath string) error {
+func PlayWav(ctx context.Context, filepath string) error {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return err
@@ -52,8 +53,12 @@ func PlayWav(filepath string) error {
 		done <- true
 	})))
 
-	// wait for it to finish playing
-	<-done
+	// wait for it to finish playing or context is canceled
+	select {
+	case <-done:
+	case <-ctx.Done():
+		speaker.Clear()
+	}
 
 	// Add a small sleep to ensure audio buffer finishes flushing
 	time.Sleep(100 * time.Millisecond)
