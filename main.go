@@ -202,7 +202,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 		return nil, "", fmt.Errorf("failed to create %s: %w", wavName, err)
 	}
 
-	if err := t.EncodeWavIO(wavFile, p.Content); err != nil {
+	if err := t.EncodeWavIO(wavFile, p.ReadingScript); err != nil {
 		wavFile.Close()
 		return nil, "", fmt.Errorf("failed to encode wav: %w", err)
 	}
