@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/suapapa/signal/internal/sound/dtmf"
+	"github.com/suapapa/si-gnal/internal/sound/dtmf"
 )
 
 func TestGenerateWav(t *testing.T) {

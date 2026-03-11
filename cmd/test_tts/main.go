@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/suapapa/signal/internal/tts"
-	"github.com/suapapa/signal/internal/tts/htgo"
-	"github.com/suapapa/signal/internal/tts/supertonic"
+	"github.com/suapapa/si-gnal/internal/tts"
+	"github.com/suapapa/si-gnal/internal/tts/htgo"
+	"github.com/suapapa/si-gnal/internal/tts/supertonic"
 )
 
 var (

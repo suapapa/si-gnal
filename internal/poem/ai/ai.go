@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/suapapa/signal/internal/poem"
+	"github.com/suapapa/si-gnal/internal/poem"
 	"google.golang.org/api/option"
 )
 
@@ -25,6 +25,12 @@ func NewAI(ctx context.Context) (*AI, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create genai client: %w", err)
 	}
+
+	// models := client.ListModels(ctx)
+	// for m, err := models.Next(); err == nil; m, err = models.Next() {
+	// 	log.Println(m.Name)
+	// }
+
 	return &AI{client: client}, nil
 }
 
@@ -39,7 +45,8 @@ func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 시 내용:
 %s`, p.Title, p.Author, p.Content)
 
-	content, err := a.generate(ctx, "gemini-1.5-flash-lite", prompt)
+	model := "gemma-3-12b-it" //"gemini-2.5-flash-lite"
+	content, err := a.generate(ctx, model, prompt)
 	if err != nil {
 		return err
 	}
@@ -48,17 +55,18 @@ func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 	return nil
 }
 
-func (a *AI) FixContentForTTS(ctx context.Context, p *poem.Poem) error {
-	prompt := fmt.Sprintf(`주어진 시 본문을 TTS를 통해 읽으려해. 줄바꿈 쉼표등을 수정해서 자연스럽게 읽을 수 있게 해 줘. 설명은 제외하고 수정된 본문만 출력해.
+func (a *AI) FillReadingScript(ctx context.Context, p *poem.Poem) error {
+	prompt := fmt.Sprintf(`주어진 시 본문을 TTS를 통해 읽으려해. 줄바꿈 쉼표등을 수정해서 자연스럽게 읽을 수 있게 낭독용 대본으로 만들어. 설명은 제외하고 수정된 본문만 출력해.
 
 %s`, p.Content)
 
-	content, err := a.generate(ctx, "gemini-2.5-flash", prompt)
+	model := "gemma-3-27b-it" //"gemini-2.5-flash"
+	content, err := a.generate(ctx, model, prompt)
 	if err != nil {
 		return err
 	}
 
-	p.Content = content
+	p.ReadingScript = content
 	return nil
 }
 

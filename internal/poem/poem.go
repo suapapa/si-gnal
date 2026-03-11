@@ -129,10 +129,11 @@ func GetPoemLinks(pageNum int) ([]string, error) {
 }
 
 type Poem struct {
-	Title   string `json:"title" yaml:"title"`
-	Author  string `json:"author" yaml:"author"`
-	Content string `json:"content" yaml:"content"`
-	URL     string `json:"url" yaml:"url"`
+	Title         string `json:"title" yaml:"title"`
+	Author        string `json:"author" yaml:"author"`
+	Content       string `json:"content" yaml:"content"`
+	URL           string `json:"url" yaml:"url"`
+	ReadingScript string `json:"reading_script" yaml:"reading_script"`
 }
 
 func getTextFromHTML(n *html.Node) string {

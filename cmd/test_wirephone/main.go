@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	wirephone_sound "github.com/suapapa/signal/internal/sound/wirephone"
+	wirephone_sound "github.com/suapapa/si-gnal/internal/sound/wirephone"
 )
 
 func main() {

@@ -23,11 +23,11 @@ type Parameters struct {
 func NewDefaultParameters() *Parameters {
 	cfgs := &Parameters{
 		UseGPU:          false,
-		ONNXDir:         "assets/onnx",
+		ONNXDir:         "assets/supertonic2/onnx",
 		TotalStep:       24, // 5~32 // 값이 높으면 발음이 훨씩 정확해지고 안정적임. 대신 오래걸림.
 		Speed:           1.05,
 		SilenceDuration: 0.3,
-		VoiceStyles:     []string{"assets/voice_styles/F5.json"},
+		VoiceStyles:     []string{"assets/supertonic2/voice_styles/F5.json"},
 		Langs:           []string{"ko"},
 	}
 

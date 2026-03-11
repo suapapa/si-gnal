@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/suapapa/signal/internal/poem"
-	"github.com/suapapa/signal/internal/poem/ai"
+	"github.com/suapapa/si-gnal/internal/poem"
+	"github.com/suapapa/si-gnal/internal/poem/ai"
 )
 
 func main() {
@@ -90,7 +90,7 @@ func main() {
 		defer aiFix.Close()
 		log.Println("AI 교정 중...")
 		aiFix.CleanupContent(context.Background(), p)
-		aiFix.FixContentForTTS(context.Background(), p)
+		aiFix.FillReadingScript(context.Background(), p)
 
 		fmt.Println(strings.Repeat("=", 50))
 		fmt.Println("📣 낭송 대본:")

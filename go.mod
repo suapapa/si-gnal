@@ -1,4 +1,4 @@
-module github.com/suapapa/signal
+module github.com/suapapa/si-gnal
 
 go 1.25.5
 
@@ -8,7 +8,8 @@ require (
 	github.com/go-audio/wav v1.1.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/generative-ai-go v0.20.1
-	github.com/hajimehoshi/go-mp3 v0.3.3
+	github.com/gopxl/beep v1.4.1
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/hegedustibor/htgo-tts v0.0.0-20240912200108-467b3e535435
 	github.com/yalue/onnxruntime_go v1.27.0
 	golang.org/x/net v0.51.0
@@ -25,6 +26,8 @@ require (
 	cloud.google.com/go/longrunning v0.5.7 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/ebitengine/oto/v3 v3.1.0 // indirect
+	github.com/ebitengine/purego v0.7.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -33,7 +36,8 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.12 // indirect
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
-	github.com/hajimehoshi/oto/v2 v2.2.0 // indirect
+	github.com/hajimehoshi/oto/v2 v2.3.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect

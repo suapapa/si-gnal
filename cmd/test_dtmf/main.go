@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/suapapa/signal/internal/sound/dtmf"
+	"github.com/suapapa/si-gnal/internal/sound/dtmf"
 )
 
 func main() {
