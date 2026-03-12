@@ -17,6 +17,8 @@ require (
 	golang.org/x/net v0.51.0
 	golang.org/x/text v0.34.0
 	google.golang.org/api v0.269.0
+	periph.io/x/conn/v3 v3.7.2
+	periph.io/x/host/v3 v3.8.5
 )
 
 require (

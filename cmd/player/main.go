@@ -15,6 +15,9 @@ import (
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/speaker"
 	"github.com/gopxl/beep/wav"
+	"periph.io/x/conn/v3/gpio"
+	"periph.io/x/conn/v3/gpio/gpioreg"
+	"periph.io/x/host/v3"
 )
 
 type headResponse struct {
@@ -35,8 +38,47 @@ type playerState struct {
 
 func main() {
 	var addr string
+	var gpioPin string
 	flag.StringVar(&addr, "addr", "http://localhost:8080", "server address")
+	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO23)")
 	flag.Parse()
+
+	state := &playerState{}
+
+	if gpioPin != "" {
+		if _, err := host.Init(); err != nil {
+			log.Fatalf("failed to initialize periph: %v", err)
+		}
+		p := gpioreg.ByName(gpioPin)
+		if p == nil {
+			log.Fatalf("failed to find GPIO pin: %s", gpioPin)
+		}
+		if err := p.In(gpio.PullUp, gpio.FallingEdge); err != nil {
+			log.Fatalf("failed to setup GPIO pin: %v", err)
+		}
+
+		go func() {
+			lastPress := time.Now()
+			for {
+				if p.WaitForEdge(-1) {
+					if time.Since(lastPress) < 500*time.Millisecond {
+						continue
+					}
+					lastPress = time.Now()
+
+					state.mu.Lock()
+					isPlaying := state.isPlaying
+					state.mu.Unlock()
+
+					if isPlaying {
+						stopPoem(addr, state)
+					} else {
+						go playPoem(addr, state)
+					}
+				}
+			}
+		}()
+	}
 
 	if err := keyboard.Open(); err != nil {
 		log.Fatal(err)
@@ -47,8 +89,10 @@ func main() {
 	fmt.Println("  [p] - Play next poem")
 	fmt.Println("  [s] - Stop playback")
 	fmt.Println("  [q/ESC] - Quit")
+	if gpioPin != "" {
+		fmt.Printf("  GPIO %s - Toggle Play/Stop\n", gpioPin)
+	}
 
-	state := &playerState{}
 
 	for {
 		char, key, err := keyboard.GetKey()
