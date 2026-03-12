@@ -44,7 +44,7 @@ Si-gnal 서버 구동을 위해 다음 환경변수들이 설정되어야 합니
 프로젝트 루트 디렉토리에서 다음 명령어로 서버를 실행합니다.
 
 ```bash
-go run main.go [옵션]
+go run cmd/server/main.go [옵션]
 ```
 
 **실행 옵션 (Flags)**
@@ -56,22 +56,41 @@ go run main.go [옵션]
 | `-n` | `bool` | `false` | 오디오에 백그라운드 노이즈 추가 (`-e` 효과와 시너지) |
 | `-p` | `bool` | `false` | (Legacy) 생성된 wav 파일을 서버 내부 큐에 넣는 대신 보류하고 직접 스피커로 재생 |
 | `-t` | `string` | `"supertonic"` | 사용할 TTS 엔진 지정 (`supertonic`, `htgo` 중 선택) |
+| `-m` | `bool` | `false` | 생성된 wav 파일을 디스크 대신 메모리에 저장 |
 
 **실행 예시:**
 > 노이즈와 전화기 효과를 넣고, 미리 3개의 음성을 확보한 상태로 서버 시작
 ```bash
-go run main.go -e -n -b 3
+go run cmd/server/main.go -e -n -b 3
 ```
 
-### 2. 시 낭독 재생 (API 호출)
+### 2. REST API
 
-서버가 실행되면(기본 포트: 8080), 아래와 같이 HTTP POST 요청을 보내어 대기열에 있는 시 하나를 재생할 수 있습니다.
+서버가 실행되면(기본 포트: 8080), 아래와 같은 API들을 통해 대기열을 관리하고 시를 감상할 수 있습니다.
 
-```bash
-curl -X POST http://localhost:8080/api/play
-```
-- **동작**: 정상적으로 호출될 경우, 백그라운드에서 미리 준비된 시가 서버 기기의 스피커를 통해 즉시 낭독됩니다. 재생 완료된 파일은 큐에서 제거, 삭제되며 백그라운드 워커가 다시 새 시를 다운로드하고 녹음하여 빈 배치를 채웁니다.
-- **반환값**: 파일명(`wavName`), 작가/제목 등의 메타데이터 및 낭송 대본이 포함된 JSON 형태.
+#### 큐 상태 확인
+- **`GET /api/poem`**: 현재 대기열에 있는 모든 시와 생성된 파일 정보를 JSON 리스트로 반환합니다.
+
+#### 시 정보 조회 (Peek)
+- **`GET /api/poem/head`**: 대기열의 가장 첫 번째 시 정보를 반환합니다. (큐에서 제거되지 않음)
+
+#### 시 꺼내기 (Pop)
+- **`GET /api/poem/pop`**: 대기열의 가장 첫 번째 시 정보를 반환하고 큐에서 제거합니다.
+
+---
+
+#### 추가 기능 (Query Parameters)
+`head` 또는 `pop` 엔드포인트 호출 시 `play` 쿼리 파라미터를 통해 추가 동작을 지정할 수 있습니다.
+
+- **스피커로 재생**: `?play=speaker`
+  - 명령: `curl http://localhost:8080/api/poem/pop?play=speaker`
+  - 정보(JSON)를 반환함과 동시에 서버 기기의 스피커로 시를 낭독합니다.
+- **오디오 파일 스트림**: `?play=wav`
+  - 명령: `curl http://localhost:8080/api/poem/pop?play=wav --output poem.wav`
+  - JSON 대신 실제 생성된 `.wav` 오디오 파일 데이터를 직접 반환합니다.
+
+#### 재생 제어
+- **`POST /api/stop`**: 현재 스피커로 재생 중인 낭독을 중단하고 파일을 정리합니다.
 
 ---
 
@@ -80,6 +99,6 @@ curl -X POST http://localhost:8080/api/play
 단순히 지정한 형식에 맞춰 무작위 시를 콘솔 환경에서 확인하고 싶을 때 유용한 도구도 포함되어 있습니다.
 
 ```bash
-go run cmd/random_poem/main.go -f <출력형식>
+go run test_cmd/random_poem/main.go -f <출력형식>
 ```
 위 명령어를 사용하면 무작위 시 한 편과 다듬어진 AI 낭송 대본을 콘솔로 출력합니다. (출력형식 지원: `txt`, `yaml`, `json`)

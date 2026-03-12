@@ -1,7 +1,9 @@
 package player
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -25,7 +27,23 @@ func PlayWav(ctx context.Context, filepath string) error {
 	}
 	defer f.Close()
 
-	streamer, format, err := wav.Decode(f)
+	return play(ctx, f)
+}
+
+// PlayWavFromBytes plays the wav data from bytes through the system's default speaker.
+func PlayWavFromBytes(ctx context.Context, data []byte) error {
+	r := &readCloser{bytes.NewReader(data)}
+	return play(ctx, r)
+}
+
+type readCloser struct {
+	io.ReadSeeker
+}
+
+func (rc *readCloser) Close() error { return nil }
+
+func play(ctx context.Context, rs io.ReadSeeker) error {
+	streamer, format, err := wav.Decode(rs)
 	if err != nil {
 		return err
 	}
