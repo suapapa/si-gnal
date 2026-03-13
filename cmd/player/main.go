@@ -39,8 +39,10 @@ type playerState struct {
 func main() {
 	var addr string
 	var gpioPin string
+	var inverse bool
 	flag.StringVar(&addr, "addr", "http://localhost:8080", "server address")
-	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO26)")
+	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO23)")
+	flag.BoolVar(&inverse, "inverse", false, "inverse GPIO logic (High->Low starts, Low->High stops)")
 	flag.Parse()
 
 	state := &playerState{}
@@ -58,30 +60,31 @@ func main() {
 		}
 
 		go func() {
-			lastPress := time.Now()
 			lastLevel := gpio.High
+			// 초기 상태 읽기
+			lastLevel = p.Read()
 
 			for {
 				level := p.Read()
-				// High(1) -> Low(0) 전이 시점 감지 (버튼 누름)
-				if level == gpio.Low && lastLevel == gpio.High {
-					if time.Since(lastPress) > 500*time.Millisecond {
-						fmt.Printf("\n[DEBUG] GPIO Press Detected (Value: 0) on %s\n", gpioPin)
-						lastPress = time.Now()
+				if level != lastLevel {
+					// 기본: Low->High 재생, High->Low 정지
+					playLevel := gpio.High
+					stopLevel := gpio.Low
+					if inverse {
+						playLevel = gpio.Low
+						stopLevel = gpio.High
+					}
 
-						state.mu.Lock()
-						isPlaying := state.isPlaying
-						state.mu.Unlock()
-
-						if isPlaying {
-							stopPoem(addr, state)
-						} else {
-							go playPoem(addr, state)
-						}
+					if level == playLevel {
+						fmt.Printf("\n[DEBUG] Start signal detected on %s (Level: %v)\n", gpioPin, level)
+						go playPoem(addr, state)
+					} else if level == stopLevel {
+						fmt.Printf("\n[DEBUG] Stop signal detected on %s (Level: %v)\n", gpioPin, level)
+						stopPoem(addr, state)
 					}
 				}
 				lastLevel = level
-				time.Sleep(50 * time.Millisecond) // CPU 점유율 조절을 위한 짧은 휴식
+				time.Sleep(50 * time.Millisecond)
 			}
 		}()
 	}
