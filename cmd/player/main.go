@@ -39,9 +39,11 @@ type playerState struct {
 func main() {
 	var addr string
 	var gpioPin string
+	var useKeyboard bool
 	var inverse bool
 	flag.StringVar(&addr, "addr", "http://localhost:8080", "server address")
 	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO23)")
+	flag.BoolVar(&useKeyboard, "keyboard", false, "enable keyboard control")
 	flag.BoolVar(&inverse, "inverse", false, "inverse GPIO logic (High->Low starts, Low->High stops)")
 	flag.Parse()
 
@@ -89,35 +91,46 @@ func main() {
 		}()
 	}
 
-	if err := keyboard.Open(); err != nil {
-		log.Printf("keyboard not available: %v. continues with GPIO only.", err)
-	} else {
+	if useKeyboard {
+		if err := keyboard.Open(); err != nil {
+			log.Fatalf("failed to open keyboard: %v", err)
+		}
 		defer keyboard.Close()
+
+		fmt.Println("Controls:")
+		fmt.Println("  [p] - Play next poem")
+		fmt.Println("  [s] - Stop playback")
+		fmt.Println("  [q/ESC] - Quit")
 	}
 
-	fmt.Println("Controls:")
-	fmt.Println("  [p] - Play next poem")
-	fmt.Println("  [s] - Stop playback")
-	fmt.Println("  [q/ESC] - Quit")
 	if gpioPin != "" {
 		fmt.Printf("  GPIO %s - Toggle Play/Stop\n", gpioPin)
 	}
 
-	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			log.Fatal(err)
-		}
+	if useKeyboard {
+		for {
+			char, key, err := keyboard.GetKey()
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		if key == keyboard.KeyEsc || char == 'q' {
-			break
-		}
+			if key == keyboard.KeyEsc || char == 'q' {
+				break
+			}
 
-		switch char {
-		case 'p':
-			go playPoem(addr, state)
-		case 's':
-			stopPoem(addr, state)
+			switch char {
+			case 'p':
+				go playPoem(addr, state)
+			case 's':
+				stopPoem(addr, state)
+			}
+		}
+	} else {
+		if gpioPin != "" {
+			// keep the main goroutine alive if GPIO is used
+			select {}
+		} else {
+			log.Println("neither keyboard nor GPIO enabled. exiting.")
 		}
 	}
 }

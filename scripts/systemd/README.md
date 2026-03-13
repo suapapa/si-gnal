@@ -41,5 +41,9 @@ journalctl -u si-gnal-server -f
 ```
 
 ## Note for Player Service
+The player's interactive keyboard control is disabled by default. When running as a `systemd` service, it will only respond to GPIO signals.
 
-The player's interactive keyboard control will not work when running as a `systemd` service. Ensure you have a GPIO pin configured to trigger playback, or modify the code to ignore keyboard initialization errors.
+If you want to use keyboard controls in an interactive terminal session, run the player with the `-keyboard` flag:
+```bash
+./bin/player -keyboard
+```
