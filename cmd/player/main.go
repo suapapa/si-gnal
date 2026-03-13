@@ -40,7 +40,7 @@ func main() {
 	var addr string
 	var gpioPin string
 	flag.StringVar(&addr, "addr", "http://localhost:8080", "server address")
-	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO23)")
+	flag.StringVar(&gpioPin, "gpio", "", "GPIO pin to control playback (e.g. GPIO26)")
 	flag.Parse()
 
 	state := &playerState{}
@@ -59,23 +59,29 @@ func main() {
 
 		go func() {
 			lastPress := time.Now()
+			lastLevel := gpio.High
+
 			for {
-				if p.WaitForEdge(-1) {
-					if time.Since(lastPress) < 500*time.Millisecond {
-						continue
-					}
-					lastPress = time.Now()
+				level := p.Read()
+				// High(1) -> Low(0) 전이 시점 감지 (버튼 누름)
+				if level == gpio.Low && lastLevel == gpio.High {
+					if time.Since(lastPress) > 500*time.Millisecond {
+						fmt.Printf("\n[DEBUG] GPIO Press Detected (Value: 0) on %s\n", gpioPin)
+						lastPress = time.Now()
 
-					state.mu.Lock()
-					isPlaying := state.isPlaying
-					state.mu.Unlock()
+						state.mu.Lock()
+						isPlaying := state.isPlaying
+						state.mu.Unlock()
 
-					if isPlaying {
-						stopPoem(addr, state)
-					} else {
-						go playPoem(addr, state)
+						if isPlaying {
+							stopPoem(addr, state)
+						} else {
+							go playPoem(addr, state)
+						}
 					}
 				}
+				lastLevel = level
+				time.Sleep(50 * time.Millisecond) // CPU 점유율 조절을 위한 짧은 휴식
 			}
 		}()
 	}
@@ -92,7 +98,6 @@ func main() {
 	if gpioPin != "" {
 		fmt.Printf("  GPIO %s - Toggle Play/Stop\n", gpioPin)
 	}
-
 
 	for {
 		char, key, err := keyboard.GetKey()
