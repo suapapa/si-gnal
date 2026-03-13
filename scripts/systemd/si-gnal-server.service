@@ -5,14 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=admin
-WorkingDirectory=/home/admin/ws/si-gnal/bin
+WorkingDirectory=/home/admin/ws/si-gnal
 # Update your flags as needed. -m uses memory for wav storage.
-ExecStart=/home/admin/ws/si-gnal/bin/server -e -b 5 -m
+ExecStart=/home/admin/ws/si-gnal/bin/server -e -b 5 -m -s assets/supertonic2/onnx -v assets/supertonic2/voice_styles/F5.json
 Restart=on-failure
-# Set your Gemini API key here or in /etc/default/si-gnal-server
+# Set your Gemini API key here
 Environment=GEMINI_API_KEY=your_api_key_here
-# On Mac, this is for .dylib, on Linux it's usually .so
-# Environment=ONNXRUNTIME_LIB_PATH=/usr/local/lib/libonnxruntime.so
 
 [Install]
 WantedBy=multi-user.target

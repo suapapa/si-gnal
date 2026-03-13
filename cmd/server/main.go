@@ -31,6 +31,9 @@ var (
 	ttsEngine  string
 	playOutput bool
 	useMemory  bool
+
+	supertonicOnnxDir    string
+	supertonicVoiceStyle string
 )
 
 type Server struct {
@@ -59,6 +62,8 @@ func main() {
 	flag.BoolVar(&enticSound, "e", false, "apply wire-phone effect on output")
 	flag.BoolVar(&addNoise, "n", false, "add noise")
 	flag.StringVar(&ttsEngine, "t", "supertonic", "tts engine (supertonic, htgo)")
+	flag.StringVar(&supertonicOnnxDir, "s", "assets/supertonic2/onnx", "supertonic onnx directory")
+	flag.StringVar(&supertonicVoiceStyle, "v", "assets/supertonic2/voice_styles/F5.json", "supertonic voice style")
 	flag.BoolVar(&playOutput, "p", false, "play the output wav file directly to speaker (legacy)")
 	flag.BoolVar(&useMemory, "m", false, "store generated wav files in memory instead of files")
 	flag.Parse()
@@ -75,6 +80,8 @@ func main() {
 		ttsParams.TotalStep = 32
 		ttsParams.Speed = 0.85
 		ttsParams.SilenceDuration = 1.2
+		ttsParams.ONNXDir = supertonicOnnxDir
+		ttsParams.VoiceStyles = []string{supertonicVoiceStyle}
 		t, err = supertonic.NewTTS(ttsParams)
 	case "htgo":
 		t, err = htgo.NewTTS("ko")

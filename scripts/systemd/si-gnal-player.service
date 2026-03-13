@@ -5,7 +5,7 @@ After=network.target si-gnal-server.service
 [Service]
 Type=simple
 User=admin
-WorkingDirectory=/home/admin/ws/si-gnal/bin
+WorkingDirectory=/home/admin/ws/si-gnal
 # Update GPIO pin number according to your hardware setup
 ExecStart=/home/admin/ws/si-gnal/bin/player -gpio GPIO26
 Restart=on-failure
