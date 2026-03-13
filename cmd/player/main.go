@@ -90,9 +90,10 @@ func main() {
 	}
 
 	if err := keyboard.Open(); err != nil {
-		log.Fatal(err)
+		log.Printf("keyboard not available: %v. continues with GPIO only.", err)
+	} else {
+		defer keyboard.Close()
 	}
-	defer keyboard.Close()
 
 	fmt.Println("Controls:")
 	fmt.Println("  [p] - Play next poem")

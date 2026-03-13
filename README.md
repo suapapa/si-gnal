@@ -102,3 +102,9 @@ go run cmd/server/main.go -e -n -b 3
 go run test_cmd/random_poem/main.go -f <출력형식>
 ```
 위 명령어를 사용하면 무작위 시 한 편과 다듬어진 AI 낭송 대본을 콘솔로 출력합니다. (출력형식 지원: `txt`, `yaml`, `json`)
+
+### 3. Systemd 서비스 등록
+
+리눅스(Raspberry Pi 등) 환경에서 백그라운드 서비스로 실행하려면 `scripts/systemd` 디렉토리의 예제를 참고하세요.
+
+자세한 내용은 [scripts/systemd/README.md](scripts/systemd/README.md)를 확인하세요.

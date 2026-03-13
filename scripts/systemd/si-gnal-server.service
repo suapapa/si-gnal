@@ -1,0 +1,18 @@
+[Unit]
+Description=Si-Gnal Server
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/ws/si-gnal/bin
+# Update your flags as needed. -m uses memory for wav storage.
+ExecStart=/home/admin/ws/si-gnal/bin/server -e -b 5 -m
+Restart=on-failure
+# Set your Gemini API key here or in /etc/default/si-gnal-server
+Environment=GEMINI_API_KEY=your_api_key_here
+# On Mac, this is for .dylib, on Linux it's usually .so
+# Environment=ONNXRUNTIME_LIB_PATH=/usr/local/lib/libonnxruntime.so
+
+[Install]
+WantedBy=multi-user.target
