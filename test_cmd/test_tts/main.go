@@ -12,15 +12,21 @@ import (
 
 var (
 	inputText = "지나온 모든 계절은 너를 위한 배경이었고, 이제야 비로소 네가 선명해진 계절이 왔다."
+
+	inputFile string
 )
 
 func main() {
 	engineFlag := flag.String("engine", "supertonic", "TTS engine to use: htgo, supertonic")
+	flag.StringVar(&inputFile, "i", "", "input file")
 	flag.Parse()
 
-	args := flag.Args()
-	if len(args) > 0 {
-		inputText = args[0]
+	if inputFile != "" {
+		b, err := os.ReadFile(inputFile)
+		if err != nil {
+			log.Fatalf("Failed to read input file: %v", err)
+		}
+		inputText = string(b)
 	}
 
 	var ttsEngine tts.TTS
@@ -33,11 +39,11 @@ func main() {
 	case "supertonic":
 		params := supertonic.NewDefaultParameters()
 		params.TotalStep = 32
-		params.ONNXDir = "../../assets/onnx"
+		params.ONNXDir = "../../assets/supertonic2/onnx"
 		params.Speed = 0.85
 		params.SilenceDuration = 1.2
 		params.VoiceStyles = []string{
-			"../../assets/voice_styles/F5.json",
+			"../../assets/supertonic2/voice_styles/F5.json",
 		}
 		ttsEngine, err = supertonic.NewTTS(params)
 	default:
