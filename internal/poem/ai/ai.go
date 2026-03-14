@@ -56,10 +56,11 @@ func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 }
 
 func (a *AI) FillReadingScript(ctx context.Context, p *poem.Poem) error {
-	prompt := fmt.Sprintf(`주어진 시 본문을 TTS를 통해 읽으려해. 줄바꿈, 구두점을 수정하거나 추가해서 자연스럽게 읽을 수 있게 낭독용 대본으로 만들어줘.
-원문을 존중해서 줄 순서를 바꾸지는 마.
+	prompt := fmt.Sprintf(`주어진 시 내용(content)을 TTS를 통해 읽으려고해.
+원문을 존중하되 줄바꿈, 구두점을 수정하거나 추가해서 자연스럽게 읽을 수 있게 낭독용 대본으로 만들어줘.
 설명은 제외하고 수정된 본문만 출력해.
----
+
+시 내용:
 %s`, p.Content)
 
 	model := "gemma-3-27b-it" //"gemini-2.5-flash"
