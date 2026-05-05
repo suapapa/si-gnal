@@ -20,8 +20,8 @@ import (
 	"github.com/suapapa/si-gnal/internal/poem/ai"
 	wirephone_sound "github.com/suapapa/si-gnal/internal/sound/wirephone"
 	"github.com/suapapa/si-gnal/internal/tts"
-	"github.com/suapapa/si-gnal/internal/tts/htgo"
 	"github.com/suapapa/si-gnal/internal/tts/supertonic"
+	// "github.com/suapapa/si-gnal/internal/tts/htgo"
 )
 
 type Server struct {
@@ -70,7 +70,8 @@ func main() {
 		ttsParams.VoiceStyles = []string{cfg.TTS.Supertonic.VoiceStyle}
 		t, err = supertonic.NewTTS(ttsParams)
 	case "htgo":
-		t, err = htgo.NewTTS("ko")
+		// t, err = htgo.NewTTS("ko")
+		log.Fatal("htgo is not supported")
 	default:
 		log.Fatalf("unknown tts engine: %s", cfg.TTS.Engine)
 	}

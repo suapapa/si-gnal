@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
@@ -82,22 +83,61 @@ func (e *TTS) Close() {
 	ort.DestroyEnvironment()
 }
 
+// poemSegments splits on '.' (ASCII full stop). Empty pieces are dropped.
+// If nothing remains (e.g. only dots), the original trimmed text is used as one segment.
+func poemSegments(text string) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	parts := strings.Split(text, ".")
+	var segs []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		segs = append(segs, p+".")
+	}
+	if len(segs) == 0 {
+		return []string{text}
+	}
+	return segs
+}
+
 func (e *TTS) EncodeWavIO(w io.WriteSeeker, text string) error {
-	wav, duration, err := e.textToSpeech.Call(text, e.params.Langs[0], e.voiceStyle, e.params.TotalStep, e.params.Speed, e.params.SilenceDuration)
-	if err != nil {
-		return fmt.Errorf("error generating speech: %w", err)
+	segments := poemSegments(text)
+	if len(segments) == 0 {
+		return fmt.Errorf("empty text")
 	}
 
-	var wavOut []float64
+	sr := e.textToSpeech.SampleRate
+	silenceSamples := int(float32(sr) * e.params.SilenceDuration)
+	lang := e.params.Langs[0]
 
-	// For non-batch mode, wav is a single concatenated audio
-	wavLen := int(float32(e.textToSpeech.SampleRate) * duration)
-	wavOut = make([]float64, wavLen)
-	for j := 0; j < wavLen && j < len(wav); j++ {
-		wavOut[j] = float64(wav[j])
+	var combined []float64
+	for i, seg := range segments {
+		wav, duration, err := e.textToSpeech.Call(seg, lang, e.voiceStyle, e.params.TotalStep, e.params.Speed, e.params.SilenceDuration)
+		if err != nil {
+			return fmt.Errorf("error generating speech: %w", err)
+		}
+
+		wavLen := int(float32(sr) * duration)
+		if wavLen > len(wav) {
+			wavLen = len(wav)
+		}
+
+		if i > 0 && silenceSamples > 0 {
+			combined = append(combined, make([]float64, silenceSamples)...)
+		}
+		chunk := make([]float64, wavLen)
+		for j := 0; j < wavLen; j++ {
+			chunk[j] = float64(wav[j])
+		}
+		combined = append(combined, chunk...)
 	}
 
-	if err := writeWavFileIO(w, wavOut, e.textToSpeech.SampleRate); err != nil {
+	if err := writeWavFileIO(w, combined, sr); err != nil {
 		return fmt.Errorf("error writing wav file: %w", err)
 	}
 

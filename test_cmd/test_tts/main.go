@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/suapapa/si-gnal/internal/tts"
-	"github.com/suapapa/si-gnal/internal/tts/htgo"
 	"github.com/suapapa/si-gnal/internal/tts/supertonic"
+	// "github.com/suapapa/si-gnal/internal/tts/htgo"
 )
 
 var (
@@ -17,7 +17,7 @@ var (
 )
 
 func main() {
-	engineFlag := flag.String("engine", "supertonic", "TTS engine to use: htgo, supertonic")
+	engineFlag := flag.String("engine", "supertonic", "TTS engine to use: supertonic")
 	flag.StringVar(&inputFile, "i", "", "input file")
 	flag.Parse()
 
@@ -34,8 +34,8 @@ func main() {
 
 	// 1 & 2. Initialize the TTS engine based on the selected flag
 	switch *engineFlag {
-	case "htgo":
-		ttsEngine, err = htgo.NewTTS("ko")
+	// case "htgo":
+	// 	ttsEngine, err = htgo.NewTTS("ko")
 	case "supertonic":
 		params := supertonic.NewDefaultParameters()
 		params.TotalStep = 32
