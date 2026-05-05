@@ -1,4 +1,30 @@
-.gitignore
-si-gnal
-*.wav
+# macOS
+.DS_Store
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+
+# Prefer `go build -o bin/<name> .`
+/bin/
+
+# Default `go build` binary next to main (name = directory)
+/cmd/server/server
+/cmd/player/player
+/test_cmd/test_dtmf/test_dtmf
+/test_cmd/test_player/test_player
+/test_cmd/test_tts/test_tts
+/test_cmd/test_wirephone/test_wirephone
+/test_cmd/random_poem/random_poem
+
+# Local config (use config_sample.yaml as template)
+cmd/server/config.yaml
+
 assets/supertonic2

@@ -1,6 +1,8 @@
+// Package poem scrapes poem metadata and body text from poemlove.co.kr.
 package poem
 
 import (
+	"context"
 	"fmt"
 	stdhtml "html"
 	"net/http"
@@ -20,9 +22,10 @@ func setHeaders(req *http.Request) {
 	req.Header.Set("Referer", "https://www.poemlove.co.kr/")
 }
 
-func GetLastPage() (int, error) {
+// GetLastPage returns the last page index of the poem board (at least 1).
+func GetLastPage(ctx context.Context) (int, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", baseURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
 	if err != nil {
 		return 0, fmt.Errorf("마지막 페이지 확인 중 오류 발생: %w", err)
 	}
@@ -83,10 +86,11 @@ func GetLastPage() (int, error) {
 	return 1, nil
 }
 
-func GetPoemLinks(pageNum int) ([]string, error) {
+// GetPoemLinks returns wr_id values for poems listed on the given page.
+func GetPoemLinks(ctx context.Context, pageNum int) ([]string, error) {
 	url := fmt.Sprintf("%s&page=%d", baseURL, pageNum)
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("페이지 %d 읽기 오류: %w", pageNum, err)
 	}
@@ -155,10 +159,11 @@ func getTextFromHTML(n *html.Node) string {
 	return strings.Join(parts, "\n")
 }
 
-func GetPoemDetail(wrID string) (*Poem, error) {
+// GetPoemDetail fetches a single poem by board wr_id.
+func GetPoemDetail(ctx context.Context, wrID string) (*Poem, error) {
 	url := fmt.Sprintf("%s&wr_id=%s", baseURL, wrID)
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("상세 내용 가져오기 오류: %w", err)
 	}

@@ -3,41 +3,43 @@ package ai
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
+	"github.com/sashabaranov/go-openai"
 	"github.com/suapapa/si-gnal/internal/poem"
-	"google.golang.org/api/option"
 )
 
+// AI wraps an OpenAI-compatible HTTP client for poem cleanup and TTS script generation.
 type AI struct {
-	client *genai.Client
+	client *openai.Client
+	model  string
 }
 
-func NewAI(ctx context.Context) (*AI, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
+// NewAI builds an OpenAI-compatible chat client. baseURL may be empty to use
+// the library default (https://api.openai.com/v1). Trailing slashes on baseURL are trimmed.
+func NewAI(ctx context.Context, baseURL, apiKey, model string) (*AI, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("context: %w", err)
+	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("GEMINI_API_KEY is not set")
+		return nil, fmt.Errorf("apiKey is empty")
+	}
+	if model == "" {
+		return nil, fmt.Errorf("model is empty")
 	}
 
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create genai client: %w", err)
+	cfg := openai.DefaultConfig(apiKey)
+	if baseURL != "" {
+		cfg.BaseURL = strings.TrimRight(baseURL, "/")
 	}
 
-	// models := client.ListModels(ctx)
-	// for m, err := models.Next(); err == nil; m, err = models.Next() {
-	// 	log.Println(m.Name)
-	// }
-
-	return &AI{client: client}, nil
+	return &AI{client: openai.NewClientWithConfig(cfg), model: model}, nil
 }
 
-func (a *AI) Close() {
-	a.client.Close()
-}
+// Close releases any client resources (currently a no-op).
+func (a *AI) Close() {}
 
+// CleanupContent asks the model to strip metadata from p.Content and replaces p.Content.
 func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 	prompt := fmt.Sprintf(`주어진 시의 내용(content)에서 제목('%s')과 작가('%s') 정보, 그리고 불필요한 설명이 있다면 모두 제거하고 오직 '시의 본문'만 남겨줘.
 수정된 시의 본문만 출력하고, 다른 설명이나 말은 절대 덧붙이지 마.
@@ -45,8 +47,7 @@ func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 시 내용:
 %s`, p.Title, p.Author, p.Content)
 
-	model := "gemma-3-12b-it" //"gemini-2.5-flash-lite"
-	content, err := a.generate(ctx, model, prompt)
+	content, err := a.generate(ctx, prompt)
 	if err != nil {
 		return err
 	}
@@ -55,6 +56,7 @@ func (a *AI) CleanupContent(ctx context.Context, p *poem.Poem) error {
 	return nil
 }
 
+// FillReadingScript sets p.ReadingScript to a TTS-friendly reading of p.Content.
 func (a *AI) FillReadingScript(ctx context.Context, p *poem.Poem) error {
 	prompt := fmt.Sprintf(`주어진 시 내용(content)을 TTS를 통해 읽으려고해.
 원문을 존중하되 줄바꿈, 구두점을 수정하거나 추가해서 자연스럽게 읽을 수 있게 낭독용 대본으로 만들어줘.
@@ -63,8 +65,7 @@ func (a *AI) FillReadingScript(ctx context.Context, p *poem.Poem) error {
 시 내용:
 %s`, p.Content)
 
-	model := "gemma-3-27b-it" //"gemini-2.5-flash"
-	content, err := a.generate(ctx, model, prompt)
+	content, err := a.generate(ctx, prompt)
 	if err != nil {
 		return err
 	}
@@ -73,18 +74,18 @@ func (a *AI) FillReadingScript(ctx context.Context, p *poem.Poem) error {
 	return nil
 }
 
-func (a *AI) generate(ctx context.Context, modelName string, prompt string) (string, error) {
-	model := a.client.GenerativeModel(modelName)
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+func (a *AI) generate(ctx context.Context, prompt string) (string, error) {
+	resp, err := a.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: a.model,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+	})
 	if err != nil {
-		return "", fmt.Errorf("GenerateContent error: %w", err)
+		return "", fmt.Errorf("CreateChatCompletion: %w", err)
 	}
-
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if part, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return strings.TrimSpace(string(part)), nil
-		}
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in completion response")
 	}
-	return "", fmt.Errorf("no content generated")
+	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 }

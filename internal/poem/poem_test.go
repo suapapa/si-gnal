@@ -1,11 +1,12 @@
 package poem
 
 import (
+	"context"
 	"testing"
 )
 
 func TestGetPoemDetail(t *testing.T) {
-	p, err := GetPoemDetail("27235")
+	p, err := GetPoemDetail(context.Background(), "27235")
 	if err != nil {
 		t.Fatal(err)
 	}

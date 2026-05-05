@@ -24,18 +24,6 @@ import (
 	"github.com/suapapa/si-gnal/internal/tts/supertonic"
 )
 
-var (
-	batch      int
-	enticSound bool
-	addNoise   bool
-	ttsEngine  string
-	playOutput bool
-	useMemory  bool
-
-	supertonicOnnxDir    string
-	supertonicVoiceStyle string
-)
-
 type Server struct {
 	playMu             sync.Mutex
 	isPlaying          bool
@@ -58,47 +46,46 @@ type PlayJob struct {
 }
 
 func main() {
-	flag.IntVar(&batch, "b", 5, "batch count for pre-generated wav files")
-	flag.BoolVar(&enticSound, "e", false, "apply wire-phone effect on output")
-	flag.BoolVar(&addNoise, "n", false, "add noise")
-	flag.StringVar(&ttsEngine, "t", "supertonic", "tts engine (supertonic, htgo)")
-	flag.StringVar(&supertonicOnnxDir, "s", "assets/supertonic2/onnx", "supertonic onnx directory")
-	flag.StringVar(&supertonicVoiceStyle, "v", "assets/supertonic2/voice_styles/F5.json", "supertonic voice style")
-	flag.BoolVar(&playOutput, "p", false, "play the output wav file directly to speaker (legacy)")
-	flag.BoolVar(&useMemory, "m", false, "store generated wav files in memory instead of files")
+	var configPath string
+	flag.StringVar(&configPath, "config", "config.yaml", "path to server config (YAML)")
 	flag.Parse()
 
-	srv := NewServer(batch)
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+
+	srv := NewServer(cfg.PoemQueue.Batch)
 
 	// init engines
 	var t tts.TTS
-	var err error
 
-	switch ttsEngine {
+	switch cfg.TTS.Engine {
 	case "supertonic":
 		ttsParams := supertonic.NewDefaultParameters()
 		ttsParams.TotalStep = 32
 		ttsParams.Speed = 0.85
 		ttsParams.SilenceDuration = 1.2
-		ttsParams.ONNXDir = supertonicOnnxDir
-		ttsParams.VoiceStyles = []string{supertonicVoiceStyle}
+		ttsParams.ONNXDir = cfg.TTS.Supertonic.ONNXDir
+		ttsParams.VoiceStyles = []string{cfg.TTS.Supertonic.VoiceStyle}
 		t, err = supertonic.NewTTS(ttsParams)
 	case "htgo":
 		t, err = htgo.NewTTS("ko")
 	default:
-		log.Fatalf("unknown tts engine: %s", ttsEngine)
+		log.Fatalf("unknown tts engine: %s", cfg.TTS.Engine)
 	}
 	if err != nil {
 		log.Fatalf("failed to init TTS: %v", err)
 	}
 	defer t.Close()
 
-	aiFix, err := ai.NewAI(context.Background())
+	if cfg.OpenAI.APIKey == "" {
+		log.Fatal("openai.api_key is empty (set in config or via ${OPENAI_API_KEY} expansion)")
+	}
+	aiFix, err := ai.NewAI(context.Background(), cfg.OpenAI.BaseURL, cfg.OpenAI.APIKey, cfg.OpenAI.Model)
 	if err != nil {
 		log.Fatalf("failed to init AI: %v", err)
 	}
-	defer aiFix.Close()
-
 	defer aiFix.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -126,14 +113,14 @@ func main() {
 			}
 
 			srv.queueMu.Lock()
-			if len(srv.poemQueue) >= batch {
+			if len(srv.poemQueue) >= cfg.PoemQueue.Batch {
 				srv.queueMu.Unlock()
 				time.Sleep(1 * time.Second)
 				continue
 			}
 			srv.queueMu.Unlock()
 
-			p, wavFile, wavData, err := generateOneWav(ctx, t, aiFix)
+			p, wavFile, wavData, err := generateOneWav(ctx, t, aiFix, cfg)
 			if err != nil {
 				log.Printf("failed to generate wav: %v", err)
 				select {
@@ -148,7 +135,7 @@ func main() {
 			// check ctx again before adding
 			select {
 			case <-ctx.Done():
-				if !useMemory {
+				if !cfg.PoemQueue.UseMemory {
 					os.Remove(wavFile)
 				}
 				srv.queueMu.Unlock()
@@ -172,13 +159,13 @@ func main() {
 	r.GET("/api/poem/head", srv.handleGetPoemHead)
 	r.GET("/api/poem/pop", srv.handleGetPoemPop)
 
-	port := ":8080"
+	addr := cfg.Server.Listen
 	httpSrv := &http.Server{
-		Addr:    port,
+		Addr:    addr,
 		Handler: r,
 	}
 
-	log.Printf("🌐 Starting web server on %s...", port)
+	log.Printf("🌐 Starting web server on %s...", addr)
 	go func() {
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server failed: %v", err)
@@ -204,11 +191,14 @@ func main() {
 	log.Println("✅ Server exiting")
 }
 
-func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, string, []byte, error) {
+func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI, cfg *Config) (*poem.Poem, string, []byte, error) {
 	now := time.Now()
 
 	log.Println("📜 Fetching a random poem...")
-	p := fetchRandomPoem()
+	p, err := fetchRandomPoem(ctx)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("fetch random poem: %w", err)
+	}
 
 	log.Printf("🧹 Making poem %s - %s to Reading Script...", p.Title, p.Author)
 	if err := aiFix.CleanupContent(ctx, p); err != nil {
@@ -216,7 +206,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 	}
 
 	if err := aiFix.FillReadingScript(ctx, p); err != nil {
-		return nil, "", nil, fmt.Errorf("FixContentForTTS failed: %w", err)
+		return nil, "", nil, fmt.Errorf("FillReadingScript: %w", err)
 	}
 
 	log.Println("📜 Poem Script for Reading:")
@@ -229,7 +219,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 	var ws io.WriteSeeker
 	var memW *MemoryReadWriteSeeker
 
-	if useMemory {
+	if cfg.PoemQueue.UseMemory {
 		memW = &MemoryReadWriteSeeker{}
 		ws = memW
 	} else {
@@ -246,10 +236,10 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 	}
 
 	finalWavName := wavName
-	if enticSound {
+	if cfg.Wirephone.Enabled {
 		log.Println("📞 Applying wirephone effect...")
 		var rs io.ReadSeeker
-		if useMemory {
+		if cfg.PoemQueue.UseMemory {
 			rs = memW
 		} else {
 			f, err := os.Open(wavName)
@@ -268,7 +258,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 		var outWs io.WriteSeeker
 		var outMemW *MemoryReadWriteSeeker
 
-		if useMemory {
+		if cfg.PoemQueue.UseMemory {
 			outMemW = &MemoryReadWriteSeeker{}
 			outWs = outMemW
 		} else {
@@ -280,12 +270,12 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 			outWs = phoneWavFile
 		}
 
-		err := wirephone_sound.MakeAntiquePhone(rs, outWs, addNoise)
+		err := wirephone_sound.MakeAntiquePhone(rs, outWs, cfg.Wirephone.AddNoise)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("failed to apply wirephone effect: %w", err)
 		}
 
-		if useMemory {
+		if cfg.PoemQueue.UseMemory {
 			memW = outMemW
 		} else {
 			os.Remove(wavName) // Remove original wave when wirephone effect applied
@@ -294,14 +284,14 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI) (*poem.Poem, s
 	}
 
 	var wavData []byte
-	if useMemory {
+	if cfg.PoemQueue.UseMemory {
 		wavData = memW.Bytes()
 		wavName = finalWavName
 	} else {
 		wavName = finalWavName
 	}
 
-	log.Printf("Successfully created %s (memory: %v)\n\n", finalWavName, useMemory)
+	log.Printf("Successfully created %s (memory: %v)\n\n", finalWavName, cfg.PoemQueue.UseMemory)
 	return p, wavName, wavData, nil
 }
 
@@ -358,26 +348,26 @@ func (m *MemoryReadWriteSeeker) Bytes() []byte {
 	return m.buf
 }
 
-func fetchRandomPoem() *poem.Poem {
-	lastPage, err := poem.GetLastPage()
+func fetchRandomPoem(ctx context.Context) (*poem.Poem, error) {
+	lastPage, err := poem.GetLastPage(ctx)
 	if err != nil {
-		log.Fatalf("failed to get last page: %v", err)
+		return nil, fmt.Errorf("get last page: %w", err)
 	}
 
 	page := rand.Intn(lastPage) + 1
-	links, err := poem.GetPoemLinks(page)
+	links, err := poem.GetPoemLinks(ctx, page)
 	if err != nil {
-		log.Fatalf("failed to get poem links: %v", err)
+		return nil, fmt.Errorf("get poem links: %w", err)
 	}
 	if len(links) == 0 {
-		log.Fatalf("no poems found on page %d", page)
+		return nil, fmt.Errorf("no poems found on page %d", page)
 	}
 
 	link := links[rand.Intn(len(links))]
-	p, err := poem.GetPoemDetail(link)
+	p, err := poem.GetPoemDetail(ctx, link)
 	if err != nil {
-		log.Fatalf("failed to get poem detail: %v", err)
+		return nil, fmt.Errorf("get poem detail: %w", err)
 	}
 
-	return p
+	return p, nil
 }

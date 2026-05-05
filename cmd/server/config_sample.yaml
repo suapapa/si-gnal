@@ -1,0 +1,24 @@
+# Copy to config.yaml and adjust. Paths are relative to the process working directory
+# unless you use absolute paths. ${VAR} is expanded from the environment after load.
+
+server:
+  listen: ":8080"
+
+poem_queue:
+  batch: 5
+  use_memory: false
+
+openai:
+  base_url: ""
+  api_key: "${OPENAI_API_KEY}"
+  model: gpt-4o-mini
+
+tts:
+  engine: supertonic
+  supertonic:
+    onnx_dir: assets/supertonic2/onnx
+    voice_style: assets/supertonic2/voice_styles/F5.json
+
+wirephone:
+  enabled: false
+  add_noise: false
