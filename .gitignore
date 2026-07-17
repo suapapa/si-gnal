@@ -28,3 +28,7 @@ coverage.*
 cmd/server/config.yaml
 
 assets/supertonic2
+test_cmd/
+
+.agents/
+skills-lock.json
