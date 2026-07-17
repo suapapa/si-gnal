@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/suapapa/si-gnal/internal/tts"
-	"github.com/suapapa/si-gnal/internal/tts/supertonic"
+	supertonic3 "github.com/suapapa/si-gnal/internal/tts/supertonic3"
 	// "github.com/suapapa/si-gnal/internal/tts/htgo"
 )
 
@@ -37,7 +37,7 @@ func main() {
 	// case "htgo":
 	// 	ttsEngine, err = htgo.NewTTS("ko")
 	case "supertonic":
-		params := supertonic.NewDefaultParameters()
+		params := supertonic3.NewDefaultParameters()
 		params.TotalStep = 32
 		params.ONNXDir = "../../assets/supertonic2/onnx"
 		params.Speed = 0.85
@@ -45,7 +45,7 @@ func main() {
 		params.VoiceStyles = []string{
 			"../../assets/supertonic2/voice_styles/F5.json",
 		}
-		ttsEngine, err = supertonic.NewTTS(params)
+		ttsEngine, err = supertonic3.NewTTS(params)
 	default:
 		log.Fatalf("Unknown engine: %s. Available options: htgo, melotts, supertonic", *engineFlag)
 	}

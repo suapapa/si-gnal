@@ -5,7 +5,7 @@ set -euo pipefail
 # https://github.com/microsoft/onnxruntime
 
 VERSION="${VERSION:-1.27.1}"
-PLATFORM="${PLATFORM:-linux-x64}"
+PLATFORM="${PLATFORM:-linux-x64}" # osx-arm64
 TARGET_DIR="${TARGET_DIR:-assets/onnx}"
 
 ARCHIVE="onnxruntime-${PLATFORM}-${VERSION}.tgz"

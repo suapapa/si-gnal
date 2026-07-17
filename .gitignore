@@ -28,6 +28,8 @@ coverage.*
 cmd/server/config.yaml
 
 assets/supertonic2
+assets/supertonic3
+assets/onnx
 test_cmd/
 
 .agents/

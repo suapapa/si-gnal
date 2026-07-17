@@ -20,7 +20,7 @@ import (
 	"github.com/suapapa/si-gnal/internal/poem/ai"
 	wirephone_sound "github.com/suapapa/si-gnal/internal/sound/wirephone"
 	"github.com/suapapa/si-gnal/internal/tts"
-	"github.com/suapapa/si-gnal/internal/tts/supertonic"
+	supertonic3 "github.com/suapapa/si-gnal/internal/tts/supertonic3"
 	// "github.com/suapapa/si-gnal/internal/tts/htgo"
 )
 
@@ -62,13 +62,13 @@ func main() {
 
 	switch cfg.TTS.Engine {
 	case "supertonic":
-		ttsParams := supertonic.NewDefaultParameters()
+		ttsParams := supertonic3.NewDefaultParameters()
 		ttsParams.TotalStep = 32
 		ttsParams.Speed = 0.85
 		ttsParams.SilenceDuration = 1.2
 		ttsParams.ONNXDir = cfg.TTS.Supertonic.ONNXDir
 		ttsParams.VoiceStyles = []string{cfg.TTS.Supertonic.VoiceStyle}
-		t, err = supertonic.NewTTS(ttsParams)
+		t, err = supertonic3.NewTTS(ttsParams)
 	case "htgo":
 		// t, err = htgo.NewTTS("ko")
 		log.Fatal("htgo is not supported")

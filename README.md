@@ -44,7 +44,7 @@ export OPENAI_API_KEY="sk-..."
 ### 3. Supertonic 모델
 
 ```bash
-./scripts/download_supertonic.sh
+./scripts/download_supertonic2.sh
 ```
 
 모델은 기본적으로 `assets/supertonic2` 아래에 두며, `config.yaml`의 `tts.supertonic.onnx_dir`, `tts.supertonic.voice_style`으로 경로를 바꿀 수 있습니다.
