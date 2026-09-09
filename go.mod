@@ -3,7 +3,7 @@ module github.com/suapapa/si-gnal
 go 1.27.0
 
 require (
-	github.com/PuerkitoBio/goquery v1.12.0
+	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-audio/audio v1.0.0
@@ -12,16 +12,16 @@ require (
 	github.com/gopxl/beep v1.4.1
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/hegedustibor/htgo-tts v0.0.0-20240912200108-467b3e535435
-	github.com/sashabaranov/go-openai v1.41.2
-	github.com/yalue/onnxruntime_go v1.30.0
-	golang.org/x/net v0.53.0
-	golang.org/x/text v0.36.0
+	github.com/sashabaranov/go-openai v1.42.0
+	github.com/yalue/onnxruntime_go v1.36.0
+	golang.org/x/net v0.59.0
+	golang.org/x/text v0.42.0
 	periph.io/x/conn/v3 v3.7.3
 	periph.io/x/host/v3 v3.8.5
 )
 
 require (
-	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.1 // indirect
 	github.com/bytedance/sonic/loader v0.5.1 // indirect
@@ -50,7 +50,7 @@ require (
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.6.0 // indirect
 	golang.org/x/arch v0.26.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
