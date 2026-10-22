@@ -5,9 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/suapapa/si-gnal/internal/tts"
-	supertonic3 "github.com/suapapa/si-gnal/internal/tts/supertonic3"
-	// "github.com/suapapa/si-gnal/internal/tts/htgo"
+	openaits "github.com/suapapa/si-gnal/internal/tts/openai"
 )
 
 var (
@@ -17,7 +15,6 @@ var (
 )
 
 func main() {
-	engineFlag := flag.String("engine", "supertonic", "TTS engine to use: supertonic")
 	flag.StringVar(&inputFile, "i", "", "input file")
 	flag.Parse()
 
@@ -29,33 +26,14 @@ func main() {
 		inputText = string(b)
 	}
 
-	var ttsEngine tts.TTS
-	var err error
-
-	// 1 & 2. Initialize the TTS engine based on the selected flag
-	switch *engineFlag {
-	// case "htgo":
-	// 	ttsEngine, err = htgo.NewTTS("ko")
-	case "supertonic":
-		params := supertonic3.NewDefaultParameters()
-		params.TotalStep = 32
-		params.ONNXDir = "../../assets/supertonic2/onnx"
-		params.Speed = 0.85
-		params.SilenceDuration = 1.2
-		params.VoiceStyles = []string{
-			"../../assets/supertonic2/voice_styles/F5.json",
-		}
-		ttsEngine, err = supertonic3.NewTTS(params)
-	default:
-		log.Fatalf("Unknown engine: %s. Available options: htgo, melotts, supertonic", *engineFlag)
-	}
-
+	// OpenAI settings come from OPENAI_ENDPOINT / OPENAI_APIKEY /
+	// OPENAI_TTS_MODEL (see .env.example).
+	ttsEngine, err := openaits.NewTTS(openaits.ConfigFromEnv())
 	if err != nil {
-		log.Fatalf("Failed to initialize TTS engine %s: %v", *engineFlag, err)
+		log.Fatalf("Failed to initialize OpenAI TTS engine: %v", err)
 	}
 	defer ttsEngine.Close()
 
-	// 3. Create an output file that implements io.WriteSeeker
 	outputFile := "output.wav"
 	f, err := os.Create(outputFile)
 	if err != nil {
@@ -63,10 +41,8 @@ func main() {
 	}
 	defer f.Close()
 
-	// 4. Encode the text and write it as WAV to the file
-	log.Printf("Generating speech for: %q using engine %s...\n", inputText, *engineFlag)
-	err = ttsEngine.EncodeWavIO(f, inputText)
-	if err != nil {
+	log.Printf("Generating speech for: %q using OpenAI TTS...\n", inputText)
+	if err := ttsEngine.EncodeWavIO(f, inputText); err != nil {
 		log.Fatalf("Failed to encode wav: %v", err)
 	}
 

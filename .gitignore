@@ -24,8 +24,9 @@ coverage.*
 /test_cmd/test_wirephone/test_wirephone
 /test_cmd/random_poem/random_poem
 
-# Local config (use config_sample.yaml as template)
+# Local config & secrets (templates: cmd/server/config_sample.yaml, cmd/server/.env.example)
 cmd/server/config.yaml
+.env
 
 assets/supertonic2
 assets/supertonic3

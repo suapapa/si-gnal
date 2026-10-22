@@ -20,8 +20,7 @@ import (
 	"github.com/suapapa/si-gnal/internal/poem/ai"
 	wirephone_sound "github.com/suapapa/si-gnal/internal/sound/wirephone"
 	"github.com/suapapa/si-gnal/internal/tts"
-	supertonic3 "github.com/suapapa/si-gnal/internal/tts/supertonic3"
-	// "github.com/suapapa/si-gnal/internal/tts/htgo"
+	openaits "github.com/suapapa/si-gnal/internal/tts/openai"
 )
 
 type Server struct {
@@ -57,33 +56,24 @@ func main() {
 
 	srv := NewServer(cfg.PoemQueue.Batch)
 
+	if cfg.OpenAI.APIKey == "" {
+		log.Fatal("OPENAI_APIKEY is empty (set it in the environment or .env; see cmd/server/.env.example)")
+	}
+
 	// init engines
 	var t tts.TTS
-
-	switch cfg.TTS.Engine {
-	case "supertonic":
-		ttsParams := supertonic3.NewDefaultParameters()
-		ttsParams.TotalStep = 32
-		ttsParams.Speed = 0.85
-		ttsParams.SilenceDuration = 1.2
-		ttsParams.ONNXDir = cfg.TTS.Supertonic.ONNXDir
-		ttsParams.VoiceStyles = []string{cfg.TTS.Supertonic.VoiceStyle}
-		t, err = supertonic3.NewTTS(ttsParams)
-	case "htgo":
-		// t, err = htgo.NewTTS("ko")
-		log.Fatal("htgo is not supported")
-	default:
-		log.Fatalf("unknown tts engine: %s", cfg.TTS.Engine)
-	}
+	t, err = openaits.NewTTS(openaits.Config{
+		Endpoint: cfg.OpenAI.Endpoint,
+		APIKey:   cfg.OpenAI.APIKey,
+		Model:    cfg.OpenAI.TTSModel,
+		Voices:   cfg.Voices,
+	})
 	if err != nil {
 		log.Fatalf("failed to init TTS: %v", err)
 	}
 	defer t.Close()
 
-	if cfg.OpenAI.APIKey == "" {
-		log.Fatal("openai.api_key is empty (set in config or via ${OPENAI_API_KEY} expansion)")
-	}
-	aiFix, err := ai.NewAI(context.Background(), cfg.OpenAI.BaseURL, cfg.OpenAI.APIKey, cfg.OpenAI.Model)
+	aiFix, err := ai.NewAI(context.Background(), cfg.OpenAI.Endpoint, cfg.OpenAI.APIKey, cfg.OpenAI.Model)
 	if err != nil {
 		log.Fatalf("failed to init AI: %v", err)
 	}
@@ -237,7 +227,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI, cfg *Config) (
 	}
 
 	finalWavName := wavName
-	if cfg.Wirephone.Enabled {
+	if cfg.Speaker.WirephoneEffect {
 		log.Println("📞 Applying wirephone effect...")
 		var rs io.ReadSeeker
 		if cfg.PoemQueue.UseMemory {
@@ -271,7 +261,7 @@ func generateOneWav(ctx context.Context, t tts.TTS, aiFix *ai.AI, cfg *Config) (
 			outWs = phoneWavFile
 		}
 
-		err := wirephone_sound.MakeAntiquePhone(rs, outWs, cfg.Wirephone.AddNoise)
+		err := wirephone_sound.MakeAntiquePhone(rs, outWs, cfg.Speaker.AddNoise)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("failed to apply wirephone effect: %w", err)
 		}

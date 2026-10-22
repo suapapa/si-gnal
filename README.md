@@ -9,15 +9,14 @@
 
 - **무작위 시 추출**: 시사랑 사이트에서 무작위로 시를 가져옵니다.
 - **AI 대본 정리**: OpenAI 호환 Chat API를 사용해 본문 정제와 낭독용 스크립트(`ReadingScript`)를 생성합니다.
-- **음성 합성(TTS)**: [Supertonic](https://huggingface.co/Supertone/supertonic-2) ONNX 기반 엔진으로 텍스트를 `.wav`로 변환합니다.
+- **음성 합성(TTS)**: OpenAI Speech API(`OPENAI_TTS_MODEL`)로 텍스트를 `.wav`로 변환합니다.
 - **백그라운드 생성**: API 호출 시 바로 재생할 수 있도록 미리 여러 개의 오디오를 만들어 큐에 넣습니다.
 - **음향 효과**: 설정에서 wire-phone(아날로그 전화선) 효과와 노이즈를 켤 수 있습니다.
 
 ## 요구 사항
 
 - Go **1.25.5** 이상 (`go.mod` 기준)
-- **OpenAI 호환 API 키** (기본은 OpenAI 공식 엔드포인트; `base_url`로 호환 서비스 지정 가능)
-- Supertonic 사용 시: Hugging Face의 [supertonic-2](https://huggingface.co/Supertone/supertonic-2) 에셋 및 (macOS 등에서) ONNX Runtime 동적 라이브러리
+- **OpenAI 호환 API 키** (기본은 OpenAI 공식 엔드포인트; `OPENAI_ENDPOINT`로 호환 서비스 지정 가능)
 
 ## 환경 설정
 
@@ -29,33 +28,22 @@
 cp cmd/server/config_sample.yaml config.yaml
 ```
 
-값에 `${환경변수명}`을 쓰면 로드 후 환경에서 치환됩니다.
-
 ### 2. OpenAI API
 
-`config.yaml`의 `openai` 섹션에 키를 넣거나, 샘플처럼 `${OPENAI_API_KEY}`만 두고 셸에서 설정합니다.
+OpenAI 설정은 `config.yaml`이 아닌 환경변수(또는 `.env`)에서 읽습니다. 서버 전용이므로 `cmd/server/.env.example`을 복사해 채웁니다.
 
 ```bash
-export OPENAI_API_KEY="sk-..."
+cp cmd/server/.env.example cmd/server/.env
 ```
 
-선택: `openai.base_url`을 비우면 라이브러리 기본값(`https://api.openai.com/v1`)을 쓰고, 다른 호환 제공자를 쓰려면 URL을 지정합니다. `openai.model` 기본값은 `gpt-4o-mini`입니다.
+| 환경변수 | 설명 |
+|----------|------|
+| `OPENAI_ENDPOINT` | OpenAI 호환 API 베이스 URL (기본 `https://api.openai.com/v1`) |
+| `OPENAI_APIKEY` | OpenAI API 키 (필수) |
+| `OPENAI_MODEL` | 시 정제·낭독 대본용 Chat 모델 (기본 `gpt-4o-mini`) |
+| `OPENAI_TTS_MODEL` | TTS 모델 (기본 `gpt-4o-mini-tts`) |
 
-### 3. Supertonic 모델
-
-```bash
-./scripts/download_supertonic2.sh
-```
-
-모델은 기본적으로 `assets/supertonic2` 아래에 두며, `config.yaml`의 `tts.supertonic.onnx_dir`, `tts.supertonic.voice_style`으로 경로를 바꿀 수 있습니다.
-
-### 4. macOS에서 ONNX Runtime
-
-```bash
-export ONNXRUNTIME_LIB_PATH=$(brew --prefix onnxruntime 2>/dev/null)/lib/libonnxruntime.dylib
-```
-
-> `.zshrc` 등에 넣어두면 편합니다.
+서버는 실행 시 `.env`(설정 파일 옆 또는 작업 디렉터리)를 자동으로 읽으며, 이미 셸에 설정된 환경변수가 우선합니다.
 
 ## 설정 항목 (`config.yaml`)
 
@@ -64,12 +52,9 @@ export ONNXRUNTIME_LIB_PATH=$(brew --prefix onnxruntime 2>/dev/null)/lib/libonnx
 | `server.listen` | HTTP 바인딩 주소 (기본 `:8080`) |
 | `poem_queue.batch` | 미리 만들어 둘 wav 개수 (기본 `5`) |
 | `poem_queue.use_memory` | `true`면 wav를 디스크 대신 메모리에 보관 |
-| `openai.base_url`, `openai.api_key`, `openai.model` | OpenAI 호환 클라이언트 설정 |
-| `tts.engine` | 현재 `supertonic`만 지원 |
-| `tts.supertonic.onnx_dir` | ONNX 디렉터리 |
-| `tts.supertonic.voice_style` | 음성 스타일 JSON 경로 |
-| `wirephone.enabled` | 전화선 효과 적용 여부 |
-| `wirephone.add_noise` | 효과에 노이즈 추가 (`enabled`와 함께 사용) |
+| `speaker.wirephone_effect` | 스피커 재생 시 전화선 효과 적용 여부 |
+| `speaker.add_noise` | 효과에 노이즈 추가 (`wirephone_effect`와 함께 사용) |
+| `voices` | OpenAI TTS 음성 이름 목록. 있으면 시 한 편당 하나를 랜덤으로 골라 `/audio/speech`의 `voice`로 전송. 비우면 기본 음성(`coral`) |
 
 ## 사용법
 
@@ -115,13 +100,13 @@ go run ./test_cmd/random_poem -f txt
 go run ./test_cmd/random_poem -f yaml -o poem.yaml
 ```
 
-선택적으로 AI 교정·낭독 대본을 쓰려면 다음을 설정합니다. `SIGNAL_OPENAI_BASE_URL`이 비어 있으면 AI 단계는 건너뜁니다.
+선택적으로 AI 교정·낭독 대본을 쓰려면 다음을 설정합니다. `OPENAI_APIKEY`가 비어 있으면 AI 단계는 건너뜁니다.
 
-- `SIGNAL_OPENAI_BASE_URL`
-- `SIGNAL_OPENAI_API_KEY`
-- `SIGNAL_OPENAI_MODEL` (비우면 `gpt-4o-mini`)
+- `OPENAI_ENDPOINT`
+- `OPENAI_APIKEY`
+- `OPENAI_MODEL` (비우면 `gpt-4o-mini`)
 
-**TTS 단독 스모크 테스트** (`test_cmd/test_tts`): Supertonic으로 짧은 문장 또는 `-i` 파일을 wav로보냅니다. ONNX 경로·라이브러리는 서버와 동일하게 맞춥니다.
+**TTS 단독 스모크 테스트** (`test_cmd/test_tts`): OpenAI TTS로 짧은 문장 또는 `-i` 파일을 wav로 보냅니다. `OPENAI_APIKEY` 등 위 환경변수를 사용합니다.
 
 ### Systemd (라즈베리 파이 등)
 

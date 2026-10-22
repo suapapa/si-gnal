@@ -1,4 +1,4 @@
-.PHONY: all clean player server assets
+.PHONY: all clean player server
 
 BIN_DIR := bin
 
@@ -15,7 +15,3 @@ server: $(BIN_DIR)
 
 clean:
 	rm -rf $(BIN_DIR)
-
-assets:
-	@chmod +x scripts/download_supertonic.sh
-	./scripts/download_supertonic.sh

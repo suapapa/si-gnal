@@ -1,5 +1,6 @@
 # Copy to config.yaml and adjust. Paths are relative to the process working directory
-# unless you use absolute paths. ${VAR} is expanded from the environment after load.
+# unless you use absolute paths.
+# OpenAI settings are read from the environment (see .env.example in this directory), not from here.
 
 server:
   listen: ":8080"
@@ -8,17 +9,11 @@ poem_queue:
   batch: 5
   use_memory: false
 
-openai:
-  base_url: ""
-  api_key: "${OPENAI_API_KEY}"
-  model: gpt-4o-mini
-
-tts:
-  engine: supertonic
-  supertonic:
-    onnx_dir: assets/supertonic2/onnx
-    voice_style: assets/supertonic2/voice_styles/F5.json
-
-wirephone:
-  enabled: false
+speaker:
+  wirephone_effect: false
   add_noise: false
+
+# OpenAI TTS voices to choose from at random (one per poem).
+# Empty (or omitted) uses the default voice (coral).
+# e.g. voices: [coral, nova, shimmer, alloy, echo, fable, onyx, ash, ballad, verse]
+voices: []

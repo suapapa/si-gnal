@@ -110,12 +110,12 @@ func run(ctx context.Context, outFmt outputFormat, outFile string) error {
 }
 
 func maybeApplyAI(ctx context.Context, p *poem.Poem) error {
-	baseURL := os.Getenv("SIGNAL_OPENAI_BASE_URL")
-	if baseURL == "" {
+	apiKey := os.Getenv("OPENAI_APIKEY")
+	if apiKey == "" {
 		return nil
 	}
-	apiKey := os.Getenv("SIGNAL_OPENAI_API_KEY")
-	model := os.Getenv("SIGNAL_OPENAI_MODEL")
+	baseURL := os.Getenv("OPENAI_ENDPOINT")
+	model := os.Getenv("OPENAI_MODEL")
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
