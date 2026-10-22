@@ -345,20 +345,34 @@ func fetchRandomPoem(ctx context.Context) (*poem.Poem, error) {
 		return nil, fmt.Errorf("get last page: %w", err)
 	}
 
-	page := rand.Intn(lastPage) + 1
-	links, err := poem.GetPoemLinks(ctx, page)
-	if err != nil {
-		return nil, fmt.Errorf("get poem links: %w", err)
-	}
-	if len(links) == 0 {
-		return nil, fmt.Errorf("no poems found on page %d", page)
-	}
+	// poem.Get* already retries each request, but if a page/poem keeps
+	// failing (e.g. deleted post), fall back to another random pick
+	// instead of failing the whole generation cycle.
+	const maxAttempts = 3
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 
-	link := links[rand.Intn(len(links))]
-	p, err := poem.GetPoemDetail(ctx, link)
-	if err != nil {
-		return nil, fmt.Errorf("get poem detail: %w", err)
-	}
+		page := rand.Intn(lastPage) + 1
+		links, err := poem.GetPoemLinks(ctx, page)
+		if err != nil {
+			lastErr = fmt.Errorf("get poem links: %w", err)
+			continue
+		}
+		if len(links) == 0 {
+			lastErr = fmt.Errorf("no poems found on page %d", page)
+			continue
+		}
 
-	return p, nil
+		link := links[rand.Intn(len(links))]
+		p, err := poem.GetPoemDetail(ctx, link)
+		if err != nil {
+			lastErr = fmt.Errorf("get poem detail: %w", err)
+			continue
+		}
+		return p, nil
+	}
+	return nil, lastErr
 }

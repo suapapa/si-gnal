@@ -2,9 +2,13 @@
 package poem
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	stdhtml "html"
+	"io"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,33 +19,108 @@ import (
 	"golang.org/x/net/html"
 )
 
-const baseURL = "https://www.poemlove.co.kr/bbs/board.php?bo_table=tb01"
+// baseURL is a var (not a const) so tests can point it at a local server.
+var baseURL = "https://www.poemlove.co.kr/bbs/board.php?bo_table=tb01"
 
 func setHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	req.Header.Set("Referer", "https://www.poemlove.co.kr/")
 }
 
-// GetLastPage returns the last page index of the poem board (at least 1).
-func GetLastPage(ctx context.Context) (int, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, "GET", baseURL, nil)
+// poemlove.co.kr intermittently drops connections (the client sees EOF,
+// connection reset, ...) or answers 5xx/429, so a single failed GET must
+// not fail the whole fetch. GETs are idempotent, therefore retrying them
+// with exponential backoff is safe. These are vars so tests can shrink
+// the delays.
+var (
+	httpClient        = &http.Client{Timeout: 15 * time.Second}
+	maxFetchAttempts  = 4
+	fetchRetryBackoff = 500 * time.Millisecond
+)
+
+// statusError reports a non-200 HTTP response.
+type statusError struct{ code int }
+
+func (e *statusError) Error() string { return fmt.Sprintf("상태 코드 %d", e.code) }
+
+func retryableStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code >= http.StatusInternalServerError
+}
+
+// fetchOnce performs a single GET and returns the fully read body.
+// Reading the body here (instead of streaming it into the parser) is what
+// lets fetch retry transfers truncated mid-body (unexpected EOF).
+func fetchOnce(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("마지막 페이지 확인 중 오류 발생: %w", err)
+		return nil, err
 	}
 	setHeaders(req)
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("마지막 페이지 확인 중 오류 발생: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("마지막 페이지 확인 중 오류 발생: 상태 코드 %d", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &statusError{code: resp.StatusCode}
+	}
+	return body, nil
+}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+// fetch GETs url, retrying transient failures (EOF, connection reset,
+// timeout, truncated body, 429/5xx) up to maxFetchAttempts times with
+// exponential backoff and jitter. Non-retryable statuses (e.g. 404) and
+// context cancellation fail immediately.
+func fetch(ctx context.Context, url string) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= maxFetchAttempts; attempt++ {
+		if attempt > 1 {
+			backoff := fetchRetryBackoff << (attempt - 2)
+			if fetchRetryBackoff > 0 {
+				backoff += time.Duration(rand.Int63n(int64(fetchRetryBackoff) + 1))
+			}
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
+		}
+
+		body, err := fetchOnce(ctx, url)
+		if err == nil {
+			return body, nil
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		var se *statusError
+		if errors.As(err, &se) && !retryableStatus(se.code) {
+			return nil, err
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
+	body, err := fetch(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	return goquery.NewDocumentFromReader(bytes.NewReader(body))
+}
+
+// GetLastPage returns the last page index of the poem board (at least 1).
+func GetLastPage(ctx context.Context) (int, error) {
+	doc, err := fetchDocument(ctx, baseURL)
 	if err != nil {
 		return 0, fmt.Errorf("마지막 페이지 확인 중 오류 발생: %w", err)
 	}
@@ -89,24 +168,7 @@ func GetLastPage(ctx context.Context) (int, error) {
 // GetPoemLinks returns wr_id values for poems listed on the given page.
 func GetPoemLinks(ctx context.Context, pageNum int) ([]string, error) {
 	url := fmt.Sprintf("%s&page=%d", baseURL, pageNum)
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("페이지 %d 읽기 오류: %w", pageNum, err)
-	}
-	setHeaders(req)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("페이지 %d 읽기 오류: %w", pageNum, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("페이지 %d 읽기 오류: 상태 코드 %d", pageNum, resp.StatusCode)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("페이지 %d 읽기 오류: %w", pageNum, err)
 	}
@@ -162,24 +224,7 @@ func getTextFromHTML(n *html.Node) string {
 // GetPoemDetail fetches a single poem by board wr_id.
 func GetPoemDetail(ctx context.Context, wrID string) (*Poem, error) {
 	url := fmt.Sprintf("%s&wr_id=%s", baseURL, wrID)
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("상세 내용 가져오기 오류: %w", err)
-	}
-	setHeaders(req)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("상세 내용 가져오기 오류: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("상세 내용 가져오기 오류: 상태 코드 %d", resp.StatusCode)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := fetchDocument(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("상세 내용 가져오기 오류: %w", err)
 	}
