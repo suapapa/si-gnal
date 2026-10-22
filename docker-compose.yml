@@ -1,0 +1,62 @@
+# si-gnal: server + player (linux/arm64 images)
+#
+#   cp cmd/server/.env.example .env   # then fill in OPENAI_APIKEY etc.
+#   docker compose up -d              # pull GHCR images and start
+#   docker compose up -d --build      # or build locally (arm64 host)
+#
+# Images are built natively for linux/arm64 by .github/workflows/docker.yml
+# and published to GHCR. The player only makes sense on the target arm64
+# board (e.g. Raspberry Pi): it needs the host sound device, and a GPIO
+# pin if playback is triggered by hardware.
+
+services:
+  server:
+    image: ghcr.io/suapapa/si-gnal-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    # Values come from the shell or the ./.env file next to this file
+    # (see cmd/server/.env.example). OPENAI_APIKEY is required.
+    environment:
+      OPENAI_ENDPOINT: ${OPENAI_ENDPOINT:-https://api.openai.com/v1}
+      OPENAI_APIKEY: ${OPENAI_APIKEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}
+    volumes:
+      - ./docker/config.yaml:/app/config.yaml:ro
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/poem"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  player:
+    image: ghcr.io/suapapa/si-gnal-player:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.player
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    # "server" resolves to the server service over the compose network.
+    # Change GPIO26 to your wiring (or replace with ["-keyboard"] plus
+    # stdin_open/tty below for interactive use). Add "-inverse" if your
+    # switch logic is inverted.
+    command: ["-addr", "http://server:8080", "-gpio", "${GPIO_PIN:-GPIO26}"]
+    # Sound output + GPIO access on the host (Raspberry Pi / Linux arm64).
+    # Remove devices you don't use; if GPIO access fails, either add the
+    # host's gpio group id to group_add or run with `privileged: true`.
+    devices:
+      - /dev/snd:/dev/snd
+      - /dev/gpiomem:/dev/gpiomem
+      - /dev/gpiochip0:/dev/gpiochip0
+    group_add:
+      - audio
+    # For keyboard control instead of GPIO:
+    # stdin_open: true
+    # tty: true

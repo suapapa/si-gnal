@@ -1,0 +1,25 @@
+.git
+.github
+
+# local build artifacts / binaries
+/bin/
+cmd/server/server
+cmd/player/player
+*.wav
+
+# secrets & local config (mounted at runtime, never baked into images)
+.env
+**/.env
+cmd/server/config.yaml
+config.yaml
+
+# large model assets not used by the OpenAI-TTS server/player binaries
+assets/
+cmd/server/assets/
+
+# docs & compose files are not needed in the build context
+README.md
+docker-compose.yml
+Dockerfile.server
+Dockerfile.player
+scripts/

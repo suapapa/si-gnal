@@ -1,0 +1,20 @@
+# Server config used by docker-compose.yml (mounted to /app/config.yaml).
+# Edit freely — OpenAI settings are NOT read from here; they come from
+# environment variables (see cmd/server/.env.example).
+
+server:
+  listen: ":8080"
+
+poem_queue:
+  batch: 5
+  # Keep wavs in memory: the container filesystem is ephemeral and
+  # /app is otherwise only writable for the generated wav files.
+  use_memory: true
+
+speaker:
+  wirephone_effect: false
+  add_noise: false
+
+# OpenAI TTS voices to choose from at random (one per poem).
+# Empty (or omitted) uses the default voice (coral).
+voices: []

@@ -108,6 +108,19 @@ go run ./test_cmd/random_poem -f yaml -o poem.yaml
 
 **TTS 단독 스모크 테스트** (`test_cmd/test_tts`): OpenAI TTS로 짧은 문장 또는 `-i` 파일을 wav로 보냅니다. `OPENAI_APIKEY` 등 위 환경변수를 사용합니다.
 
+### Docker (arm64)
+
+`cmd/server`와 `cmd/player`는 `linux/arm64` 컨테이너 이미지로 빌드됩니다. GitHub Actions(`.github/workflows/docker.yml`)가 네이티브 ARM64 러너(`ubuntu-24.04-arm`, QEMU 미사용)에서 빌드해 GHCR(`ghcr.io/suapapa/si-gnal-server`, `ghcr.io/suapapa/si-gnal-player`)에 푸시합니다.
+
+라즈베리 파이 등 arm64 호스트에서 두 컨테이너를 함께 실행하려면:
+
+```bash
+cp cmd/server/.env.example .env   # OPENAI_APIKEY 등 채우기
+docker compose up -d
+```
+
+서버 설정은 `docker/config.yaml`(컨테이너의 `/app/config.yaml`로 마운트)을 수정하세요. 플레이어는 호스트의 `/dev/snd`와 GPIO 장치(`/dev/gpiomem`, `/dev/gpiochip0`)를 사용하므로 해당 보드에서만 실행되며, 핀은 `GPIO_PIN` 환경변수(기본 `GPIO26`)로 바꿀 수 있습니다. 로컬에서 직접 빌드하려면 `docker compose up -d --build`를 사용하세요.
+
 ### Systemd (라즈베리 파이 등)
 
 `scripts/systemd` 예제와 [scripts/systemd/README.md](scripts/systemd/README.md)를 참고하세요.

@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+#
+# si-gnal player (cmd/player) — linux/arm64
+#
+# CGO is required: playback goes through ebitengine/oto/v3 -> ALSA.
+# Build this on an arm64 host (e.g. GitHub's ubuntu-24.04-arm runner)
+# so no QEMU/cross-compiler is involved.
+# At runtime the container needs the host's sound (and GPIO, if used)
+# devices — see docker-compose.yml.
+
+FROM golang:1.27-bookworm AS build
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libasound2-dev pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/player ./cmd/player
+
+FROM debian:bookworm-slim
+
+# libasound2: speaker playback (oto/ALSA)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libasound2 ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --create-home --uid 10001 app
+
+WORKDIR /app
+COPY --from=build /out/player /app/player
+
+USER app
+
+# Overridden by docker-compose.yml (server address, GPIO pin, ...).
+ENTRYPOINT ["/app/player"]
+CMD ["-addr", "http://server:8080", "-gpio", "GPIO26"]

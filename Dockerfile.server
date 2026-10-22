@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+#
+# si-gnal server (cmd/server) — linux/arm64
+#
+# CGO is required: the server can play through the local speaker
+# (?play=speaker -> internal/player -> ebitengine/oto/v3 -> ALSA).
+# Build this on an arm64 host (e.g. GitHub's ubuntu-24.04-arm runner)
+# so no QEMU/cross-compiler is involved.
+
+FROM golang:1.27-bookworm AS build
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libasound2-dev pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+
+FROM debian:bookworm-slim
+
+# libasound2: speaker playback (oto/ALSA)
+# ca-certificates: poem site + OpenAI-compatible API over HTTPS
+# curl: healthcheck
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libasound2 ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --create-home --uid 10001 app
+
+WORKDIR /app
+COPY --from=build /out/server /app/server
+RUN chown app:app /app
+
+USER app
+ENV GIN_MODE=release
+
+# config.yaml is expected at /app/config.yaml (mount it, see docker-compose.yml).
+# wav files are written to the working directory unless
+# poem_queue.use_memory is true in the config.
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8080/api/poem >/dev/null || exit 1
+
+ENTRYPOINT ["/app/server", "-config", "/app/config.yaml"]
