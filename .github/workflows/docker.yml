@@ -93,6 +93,8 @@ jobs:
           else
             manifest="$(docker buildx imagetools inspect "$tag" --format '{{json .Manifest}}')"
             echo "$manifest"
-            echo "$manifest" | grep -q '"architecture":"arm64"'
-            echo "$manifest" | grep -q '"os":"linux"'
+            # {{json}} pretty-prints, so keys look like `"architecture": "arm64"`
+            # (space after the colon) — allow whitespace in the patterns.
+            echo "$manifest" | grep -Eq '"architecture": *"arm64"'
+            echo "$manifest" | grep -Eq '"os": *"linux"'
           fi
