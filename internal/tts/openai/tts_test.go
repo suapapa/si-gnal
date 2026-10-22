@@ -109,8 +109,8 @@ func TestEncodeWavIO(t *testing.T) {
 	if gotFormat != "pcm" {
 		t.Errorf("response_format = %q, want pcm", gotFormat)
 	}
-	if gotInstructions != "In a calm poetry recitation tone." {
-		t.Errorf("instructions = %q, want %q", gotInstructions, "In a calm poetry recitation tone.")
+	if gotInstructions != "" {
+		t.Errorf("instructions = %q, want %q", gotInstructions, "")
 	}
 
 	// Sentences are joined into one chunk, so the WAV payload is just pcm.
