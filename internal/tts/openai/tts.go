@@ -5,11 +5,15 @@ package openai
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand/v2"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -181,14 +185,79 @@ func (t *TTS) EncodeWavContext(ctx context.Context, w io.WriteSeeker, text strin
 	return nil
 }
 
+// OpenAI-compatible providers intermittently drop connections or answer
+// 429/5xx (e.g. "provider API error (status 500)"), so a single failed
+// CreateSpeech must not fail the whole WAV generation — otherwise the
+// caller throws away the already-synthesized chunks and starts over.
+// Speech requests that fail this way produced no audio, therefore
+// retrying them with exponential backoff is safe. These are vars so
+// tests can shrink the delays.
+var (
+	maxSpeechAttempts  = 4
+	speechRetryBackoff = 500 * time.Millisecond
+)
+
+func retryableSpeechStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code >= http.StatusInternalServerError
+}
+
+// isRetryableSpeechError reports whether err from synthesizeOnce is worth
+// retrying: 429/5xx responses and status-less failures (EOF, connection
+// reset, timeout, truncated body). Other 4xx (e.g. 400 invalid input,
+// 401 bad key) will fail again identically, so they fail immediately.
+func isRetryableSpeechError(err error) bool {
+	var apiErr *openaisdk.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.HTTPStatusCode == 0 || retryableSpeechStatus(apiErr.HTTPStatusCode)
+	}
+	var reqErr *openaisdk.RequestError
+	if errors.As(err, &reqErr) {
+		return reqErr.HTTPStatusCode == 0 || retryableSpeechStatus(reqErr.HTTPStatusCode)
+	}
+	return true
+}
+
 func (t *TTS) synthesize(ctx context.Context, text string, voice openaisdk.SpeechVoice) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= maxSpeechAttempts; attempt++ {
+		if attempt > 1 {
+			backoff := speechRetryBackoff << (attempt - 2)
+			if speechRetryBackoff > 0 {
+				backoff += time.Duration(rand.Int64N(int64(speechRetryBackoff) + 1))
+			}
+			log.Printf("openai tts: retrying CreateSpeech (attempt %d/%d) in %s: %v", attempt, maxSpeechAttempts, backoff, lastErr)
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, fmt.Errorf("context: %w", ctx.Err())
+			case <-timer.C:
+			}
+		}
+
+		data, err := t.synthesizeOnce(ctx, text, voice)
+		if err == nil {
+			return data, nil
+		}
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("context: %w", ctx.Err())
+		}
+		if !isRetryableSpeechError(err) {
+			return nil, err
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func (t *TTS) synthesizeOnce(ctx context.Context, text string, voice openaisdk.SpeechVoice) ([]byte, error) {
 	resp, err := t.client.CreateSpeech(ctx, openaisdk.CreateSpeechRequest{
 		Model:          openaisdk.SpeechModel(t.model),
 		Input:          text,
 		Voice:          voice,
 		ResponseFormat: openaisdk.SpeechResponseFormatPcm,
 		Speed:          t.speed,
-		Instructions:   DefaultInstructions,
+		// Instructions:   DefaultInstructions,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("CreateSpeech: %w", err)
