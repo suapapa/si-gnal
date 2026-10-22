@@ -39,6 +39,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.player
+    # /dev/gpiochip* is root:gpio 0660 on the host; the image's app user
+    # (uid 10001) gets "permission denied" opening it. Run as root instead
+    # of adding the host-specific gpio gid via group_add.
+    user: "0:0"
     restart: unless-stopped
     depends_on:
       server:
@@ -48,6 +52,20 @@ services:
     # stdin_open/tty below for interactive use). Add "-inverse" if your
     # switch logic is inverted.
     command: ["-addr", "http://server:8080", "-gpio", "${GPIO_PIN:-GPIO26}"]
+    # ALSA dmix is shared over SysV IPC (ipc_key 1024 in the host's
+    # /etc/asound.conf). Without the host IPC namespace the container
+    # starts its own dmix, tries to open the hw device directly and
+    # fails with "snd_pcm_dmix_open unable to open slave" whenever a
+    # host process (e.g. i2samp's /dev/zero aplay.service, or the host
+    # dmix itself) already owns it. Sharing IPC lets the container join
+    # the host dmix instead. See docs/max98357a-raspberry-pi.md.
+    ipc: host
+    volumes:
+      # Use the host's ALSA config inside the container so the card
+      # name (e.g. sndrpigooglevoi, not just card 0), dmixer and softvol
+      # definitions match the host exactly. Requires i2samp (or the
+      # manual setup) to have been run on the host first.
+      - /etc/asound.conf:/etc/asound.conf:ro
     # Sound output + GPIO access on the host (Raspberry Pi / Linux arm64).
     # Remove devices you don't use; if GPIO access fails, either add the
     # host's gpio group id to group_add or run with `privileged: true`.

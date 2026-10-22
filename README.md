@@ -124,3 +124,7 @@ docker compose up -d
 ### Systemd (라즈베리 파이 등)
 
 `scripts/systemd` 예제와 [scripts/systemd/README.md](scripts/systemd/README.md)를 참고하세요.
+
+### 오디오 앰프 (MAX98357A)
+
+라즈베리 파이에서 Adafruit MAX98357A I2S 앰프로 스피커를 구동하려면 배선·ALSA 설정이 먼저 필요합니다. [docs/max98357a-raspberry-pi.md](docs/max98357a-raspberry-pi.md)를 참고하세요.
