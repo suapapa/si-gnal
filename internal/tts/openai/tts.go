@@ -28,6 +28,10 @@ const (
 	DefaultEndpoint = "https://api.openai.com/v1"
 	DefaultModel    = string(openaisdk.TTSModelGPT4oMini)
 	DefaultVoice    = openaisdk.VoiceCoral
+	// DefaultInstructions is sent as the speech `instructions` field so
+	// poems are read in a calm recitation tone.
+	DefaultInstructions = ""
+	// DefaultInstructions = "In a calm poetry recitation tone."
 )
 
 // OpenAI returns raw PCM from the speech API at 24kHz, 16-bit, mono.
@@ -184,6 +188,7 @@ func (t *TTS) synthesize(ctx context.Context, text string, voice openaisdk.Speec
 		Voice:          voice,
 		ResponseFormat: openaisdk.SpeechResponseFormatPcm,
 		Speed:          t.speed,
+		Instructions:   DefaultInstructions,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("CreateSpeech: %w", err)

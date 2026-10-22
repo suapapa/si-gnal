@@ -62,7 +62,7 @@ func TestNewTTSRequiresAPIKey(t *testing.T) {
 
 func TestEncodeWavIO(t *testing.T) {
 	pcm := []byte{0x01, 0x00, 0xff, 0xff, 0x00, 0x00}
-	var gotModel, gotVoice, gotFormat string
+	var gotModel, gotVoice, gotFormat, gotInstructions string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/audio/speech" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -71,15 +71,16 @@ func TestEncodeWavIO(t *testing.T) {
 			t.Errorf("unexpected authorization: %q", auth)
 		}
 		var req struct {
-			Model  string `json:"model"`
-			Input  string `json:"input"`
-			Voice  string `json:"voice"`
-			Format string `json:"response_format"`
+			Model        string `json:"model"`
+			Input        string `json:"input"`
+			Voice        string `json:"voice"`
+			Format       string `json:"response_format"`
+			Instructions string `json:"instructions"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode request: %v", err)
 		}
-		gotModel, gotVoice, gotFormat = req.Model, req.Voice, req.Format
+		gotModel, gotVoice, gotFormat, gotInstructions = req.Model, req.Voice, req.Format, req.Instructions
 		if req.Input == "" {
 			t.Errorf("empty input")
 		}
@@ -107,6 +108,9 @@ func TestEncodeWavIO(t *testing.T) {
 	}
 	if gotFormat != "pcm" {
 		t.Errorf("response_format = %q, want pcm", gotFormat)
+	}
+	if gotInstructions != "In a calm poetry recitation tone." {
+		t.Errorf("instructions = %q, want %q", gotInstructions, "In a calm poetry recitation tone.")
 	}
 
 	// Sentences are joined into one chunk, so the WAV payload is just pcm.
